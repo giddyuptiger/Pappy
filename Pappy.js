@@ -49,46 +49,44 @@ function myFunction() {
 
     var pages = result.getHeaders()["x-wp-totalpages"];
     // console.log(pages);
-    // var params = {};
-    // var pageParams = {};
-    /*
-      for (let i = 0; i < 1; i++) {
-        var url =
-          website +
-          "/wp-json/wc/v3/orders?consumer_key=" +
-          ck +
-          "&consumer_secret=" +
-          cs +
-          "&per_page=100" +
-          "&page=" +
-          (i + 1);
-        Logger.log(url);
-        var result = UrlFetchApp.fetch(url, options);
-        if (result.getResponseCode() == 200) {
-          // console.log('contenttext: ', JSON.parse(result.getContentText()));
-          // pageParams[i] = JSON.parse(result.getContentText());
-                  // pageParams[i] = {an: "object", another: "object or something"};
-  
-          // Logger.log('types below');
-          // Logger.log(typeof result.getContentText());
-          // Logger.log(typeof JSON.parse(result.getContentText()));
-          // Logger.log(typeof pageParams[i]);
-  
-          // var testParams = JSON.parse(result.getContentText());
-          // Logger.log(pageParams);
-          // console.log(result.getHeaders());
-        } else {
-          console.log("error: ", result.getResponseCode());
-        }
-        // params = {
-        //   ...params,
-        //   ...pageParams
-        // }
-  
-        // Logger.log('pageParams below')
-        // Logger.log(typeof pageParams[0]);
+    var params = [];
+    var pageParams = [];
+
+    for (let i = 0; i < 3; i++) {
+      var url =
+        website +
+        "/wp-json/wc/v3/orders?consumer_key=" +
+        ck +
+        "&consumer_secret=" +
+        cs +
+        "&per_page=10" +
+        "&page=" +
+        (i + 1);
+      // Logger.log(url);
+      var result = UrlFetchApp.fetch(url, options);
+      if (result.getResponseCode() == 200) {
+        // console.log('contenttext: ', JSON.parse(result.getContentText()));
+        pageParams = JSON.parse(result.getContentText());
+        params = [...params, ...pageParams];
+        // Logger.log(pageParams);
+        // pageParams[i] = {an: "object", another: "object or something"};
+
+        // Logger.log('types below');
+        // Logger.log(typeof result.getContentText());
+        // Logger.log(typeof JSON.parse(result.getContentText()));
+        // Logger.log(typeof pageParams[i]);
+
+        // var testParams = JSON.parse(result.getContentText());
+        // Logger.log(pageParams);
+        // console.log(result.getHeaders());
+      } else {
+        console.log("error: ", result.getResponseCode());
       }
-      */
+
+      // Logger.log('pageParams below')
+      // Logger.log(typeof pageParams[0]);
+    }
+
     // Logger.log('pageParams length below ')
     // Logger.log(pageParams.length);
     // Logger.log(pageParams[0][0][0]);
@@ -105,7 +103,7 @@ function myFunction() {
 
     var doc = SpreadsheetApp.getActiveSpreadsheet();
 
-    var temp = doc.getSheetByName(sheet_name);
+    var temp = doc.getSheetByName("ORDERS - processing");
 
     var ordersArray = [];
 
@@ -134,6 +132,7 @@ function myFunction() {
     ordersArray.push(headers);
 
     var consumption = {};
+    let pickList = [];
 
     var arrayLength = params.length;
     // Logger.log(arrayLength);
@@ -145,7 +144,7 @@ function myFunction() {
       var container = [];
 
       a = container.push(params[i]["billing"]["first_name"]);
-      Logger.log(a);
+      // Logger.log(a);
 
       a = container.push(params[i]["billing"]["last_name"]);
 
@@ -195,7 +194,33 @@ function myFunction() {
         items = items + item_f + ",\n";
 
         total_line_items_quantity += qty;
+
+        let itemObj = { name: item, qty: qty };
+        Logger.log(itemObj);
+
+        let found = false;
+        for (let entry of pickList) {
+          // Logger.log(itemObj.name, '=', entry.name);
+          // Logger.log(entry.qty, itemObj.qty);
+          if (itemObj["name"] === entry["name"]) {
+            entry["qty"] = entry["qty"] += itemObj["qty"];
+            found = true;
+            break;
+          } else {
+            continue;
+          }
+        }
+        if (!found) {
+          pickList.push(itemObj);
+        }
+
+        // let pickListIndex = pickList.indexOf([item]);
+        // ( pickListIndex === -1)
+        // ? pickList.push([item])
+        // :pickList[pickListIndex];
       }
+      // pickList.push({ass:'bites', tucus: 'mellow'})
+      Logger.log(pickList);
 
       a = container.push(items);
 
@@ -256,6 +281,55 @@ function myFunction() {
     var rows = ordersArray.length;
     var cols = ordersArray[0].length;
     temp.getRange(1, 1, rows, cols).setValues(ordersArray);
+
+    //PICK
+    pickList.sort(sortObjNames);
+    let pickArray = [];
+    //Build pickArray
+    for (let item of pickList) {
+      pickArray.push([item.name, item.qty]);
+    }
+    //Add Headers
+    var headers = ["Product", "Quantity"];
+    pickArray.unshift(headers);
+    //getRange info
+    let pickSheet = doc.getSheetByName("PICK");
+    var pickRows = pickArray.length;
+    var pickCols = pickArray[0].length;
+    // pickSheet.getRange(1, 1, pickRows, pickCols).setValues(pickList);
+
+    //Set Values
+    pickSheet.getRange(1, 2, pickRows, pickCols).setValues(pickArray);
+    //Format
+    pickSheet.getRange(1, 1, pickRows + 1, 1).insertCheckboxes();
+    for (var i = 0; i < pickRows; i++) {
+      if (i % 2 != 0) {
+        pickSheet.getRange(i, 1, 1, pickCols).setBackgroundColor("#fffbf2");
+      }
+    }
+    pickSheet
+      .getRange(1, 2, pickRows, 1)
+      .setFontColor("black")
+      .setFontSize("14");
+    pickSheet.setColumnWidth(1, 400);
+    pickSheet.setColumnWidth(3, 400);
+    pickSheet.getRange(1, 4, pickRows, 1).setHorizontalAlignment("center");
+    var pickLastColumn = pickSheet.getMaxColumns();
+    var pickLastRow = pickSheet.getMaxRows();
+    pickSheet.deleteColumns(pickCols + 2, pickLastColumn - pickCols);
+    // pickSheet.deleteRows(pickRows + 1, pickLastRow - pickRows)
+    pickSheet.getRange(1, 1, 1, pickCols).setFontWeight("bold");
+    //Conditional Formatting
+    var pickChecksRange = pickSheet.getRange(1, 1, pickRows, pickCols);
+    var pickRule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied("=$A1")
+      .setBackground("#666666")
+      .setRanges([pickChecksRange])
+      .build();
+    var pickRules = pickSheet.getConditionalFormatRules();
+    pickRules.push(pickRule);
+    pickSheet.setConditionalFormatRules(pickRules);
+    //protect line item on pick, unprotect with UNDO button at top.
   }
 
   function removeDuplicates(sheet_name) {
@@ -303,5 +377,29 @@ function myFunction() {
     }
     sheet.clearContents();
     sheet.getRange(1, 1, newData.length, newData[0].length).setValues(newData);
+  }
+}
+
+function sortObjNames(a, b) {
+  if (a["name"] === b["name"]) {
+    return 0;
+  } else {
+    return a["name"] < b["name"] ? -1 : 1;
+  }
+}
+
+function sortFunction(a, b) {
+  if (a[0] === b[0]) {
+    return 0;
+  } else {
+    return a[0] < b[0] ? -1 : 1;
+  }
+}
+
+function sortByProduct(a, b) {
+  if (a[0] === b[0]) {
+    return a[6] < b[6] ? -1 : a[6] > b[6] ? 1 : 0;
+  } else {
+    return a[0] < b[0] ? -1 : 1;
   }
 }
