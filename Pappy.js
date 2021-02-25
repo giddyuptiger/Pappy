@@ -225,9 +225,13 @@ function myFunction() {
           if (!found) {
             pickList.push(itemObj);
           }
+          let itemClass = "other";
           if (true) {
-            let itemClass = "ex: dry goods";
+            itemClass = "ex: dry goods";
+          } else {
+            itemClass = "ex: wet goods";
           }
+
           let packRow = [
             params[i]["billing"]["first_name"],
             params[i]["billing"]["last_name"],
