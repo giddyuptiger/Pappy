@@ -1,24 +1,29 @@
-[debug] [2021-02-27T21:17:21.201Z] ----------------------------------------------------------------------
-[debug] [2021-02-27T21:17:21.203Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\klaus\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init
-[debug] [2021-02-27T21:17:21.203Z] CLI Version:   9.4.0
-[debug] [2021-02-27T21:17:21.203Z] Platform:      win32
-[debug] [2021-02-27T21:17:21.203Z] Node Version:  v14.15.0
-[debug] [2021-02-27T21:17:21.204Z] Time:          Sat Feb 27 2021 13:17:21 GMT-0800 (Pacific Standard Time)
-[debug] [2021-02-27T21:17:21.204Z] ----------------------------------------------------------------------
-[debug] [2021-02-27T21:17:21.204Z] 
-[debug] [2021-02-27T21:17:21.207Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
-[debug] [2021-02-27T21:17:21.223Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
-[debug] [2021-02-27T21:17:21.224Z] > authorizing via signed-in user
+[debug] [2021-02-27T21:43:41.366Z] ----------------------------------------------------------------------
+[debug] [2021-02-27T21:43:41.368Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\klaus\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js serve
+[debug] [2021-02-27T21:43:41.368Z] CLI Version:   9.4.0
+[debug] [2021-02-27T21:43:41.368Z] Platform:      win32
+[debug] [2021-02-27T21:43:41.368Z] Node Version:  v14.15.0
+[debug] [2021-02-27T21:43:41.369Z] Time:          Sat Feb 27 2021 13:43:41 GMT-0800 (Pacific Standard Time)
+[debug] [2021-02-27T21:43:41.369Z] ----------------------------------------------------------------------
+[debug] [2021-02-27T21:43:41.369Z] 
+[debug] [2021-02-27T21:43:41.374Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2021-02-27T21:43:41.374Z] > authorizing via signed-in user
+[debug] [2021-02-27T21:43:41.375Z] [iam] checking project nudefoods-6d48f for permissions ["firebase.projects.get"]
+[debug] [2021-02-27T21:43:41.376Z] >>> HTTP REQUEST POST https://cloudresourcemanager.googleapis.com/v1/projects/nudefoods-6d48f:testIamPermissions  
+ {"permissions":["firebase.projects.get"]}
+[debug] [2021-02-27T21:43:41.863Z] <<< HTTP RESPONSE 200 {"content-type":"application/json; charset=UTF-8","vary":"X-Origin, Referer, Origin,Accept-Encoding","date":"Sat, 27 Feb 2021 21:43:41 GMT","server":"ESF","cache-control":"private","x-xss-protection":"0","x-frame-options":"SAMEORIGIN","x-content-type-options":"nosniff","server-timing":"gfet4t7; dur=191","alt-svc":"h3-29=\":443\"; ma=2592000,h3-T051=\":443\"; ma=2592000,h3-Q050=\":443\"; ma=2592000,h3-Q046=\":443\"; ma=2592000,h3-Q043=\":443\"; ma=2592000,quic=\":443\"; ma=2592000; v=\"46,43\"","accept-ranges":"none","transfer-encoding":"chunked"}
+[debug] [2021-02-27T21:43:41.865Z] > refreshing access token with scopes: []
+[debug] [2021-02-27T21:43:41.865Z] >>> HTTP REQUEST POST https://www.googleapis.com/oauth2/v3/token  
+ <request body omitted>
+[debug] [2021-02-27T21:43:41.986Z] <<< HTTP RESPONSE 200 {"expires":"Mon, 01 Jan 1990 00:00:00 GMT","pragma":"no-cache","date":"Sat, 27 Feb 2021 21:43:42 GMT","cache-control":"no-cache, no-store, max-age=0, must-revalidate","content-type":"application/json; charset=utf-8","vary":"X-Origin, Referer, Origin,Accept-Encoding","server":"scaffolding on HTTPServer2","x-xss-protection":"0","x-frame-options":"SAMEORIGIN","x-content-type-options":"nosniff","alt-svc":"h3-29=\":443\"; ma=2592000,h3-T051=\":443\"; ma=2592000,h3-Q050=\":443\"; ma=2592000,h3-Q046=\":443\"; ma=2592000,h3-Q043=\":443\"; ma=2592000,quic=\":443\"; ma=2592000; v=\"46,43\"","accept-ranges":"none","transfer-encoding":"chunked"}
+[debug] [2021-02-27T21:43:41.991Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/nudefoods-6d48f [none]
+[debug] [2021-02-27T21:43:42.232Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/nudefoods-6d48f 200
+[debug] [2021-02-27T21:43:42.232Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/nudefoods-6d48f {"projectId":"nudefoods-6d48f","projectNumber":"302467867139","displayName":"nudefoods","name":"projects/nudefoods-6d48f","resources":{"hostingSite":"nudefoods-6d48f","realtimeDatabaseInstance":"nudefoods-6d48f-default-rtdb"},"state":"ACTIVE"}
 [info] 
-     ######## #### ########  ######## ########     ###     ######  ########
-     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
-     ######    ##  ########  ######   ########  #########  ######  ######
-     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
-     ##       #### ##     ## ######## ########  ##     ##  ######  ########
-
-You're about to initialize a Firebase project in this directory:
-
-  C:\Users\klaus\Google Drive\_Projects\1031 - NudeFoods\Code\Pappy
-
-[debug] [2021-02-27T21:17:21.488Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
-[debug] [2021-02-27T21:17:21.488Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[info] === Serving from 'C:\Users\klaus\Google Drive\_Projects\1031 - NudeFoods\Code\Pappy'...
+[info] 
+[debug] [2021-02-27T21:43:42.234Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/nudefoods-6d48f/webApps/-/config [none]
+[warn] !  Your requested "node" version "12" doesn't match your global version "14" {"metadata":{"emulator":{"name":"functions"},"message":"Your requested \"node\" version \"12\" doesn't match your global version \"14\""}}
+[debug] [2021-02-27T21:43:42.240Z] defaultcredentials: writing to file C:\Users\klaus\AppData\Roaming\firebase\jeremydirons_gmail_com_application_default_credentials.json
+[debug] [2021-02-27T21:43:42.241Z] Setting GAC to C:\Users\klaus\AppData\Roaming\firebase\jeremydirons_gmail_com_application_default_credentials.json {"metadata":{"emulator":{"name":"functions"},"message":"Setting GAC to C:\\Users\\klaus\\AppData\\Roaming\\firebase\\jeremydirons_gmail_com_application_default_credentials.json"}}
+[debug] [2021-02-27T21:43:42.242Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/nudefoods-6d48f/adminSdkConfig [none]
