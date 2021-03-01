@@ -3,34 +3,39 @@ const orders = {};
 // function fetchOrders() {
 // const ck = "ck_e7a75e598b9551db54b160750153656c0d985ef1";
 // const cs = "cs_b341a298a50106f4756c5b62c03f47b2ea9a1ceb";
-let ck, cs;
+let ck = "ck_e7a75e598b9551db54b160750153656c0d985ef1";
+let cs = "cs_b341a298a50106f4756c5b62c03f47b2ea9a1ceb";
 const websiteURL = "https://nudefoodsmarket.com";
 const date = new Date().toISOString;
 const apiURL = "/wp-json/wc/v3/";
-const url =
-  websiteURL +
-  apiURL +
-  "orders" +
-  "?consumer_key=" +
-  ck +
-  "&consumer_secret=" +
-  cs +
-  "&per_page=100";
+let url;
+url = `${
+  websiteURL + apiURL
+}orders?consumer_key=${ck}&consumer_secret=${cs}&per_page=100`;
+console.log(url);
 
 // let options = {
 //   method: "GET",
 //   "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
 //   muteHttpExceptions: true,
 // };
-console.log(url);
 // asdsa;
 
-db.ref("admin/auth").once("value", (snap) => {
-  // console.log(snap);
-  let data = snap.val();
-  ck = data.ck;
-  cs = data.cs;
-});
+// db.ref("admin/auth")
+//   .once("value", (snap) => {
+//     // console.log(snap);
+//     console.log(snap.val());
+//     let data = snap.val();
+//     return data;
+//   })
+//   .then((data) => {
+//     ck = data.ck;
+//     cs = data.cs;
+//     console.log(ck, cs);
+//     url = `${websiteURL + apiURL}
+//     orders?consumer_key=${ck}&consumer_secret=${cs}&per_page=100`;
+//     console.log(url);
+//   });
 
 function elt(type, props, ...children) {
   let element = document.createElement(type);
@@ -43,11 +48,7 @@ function elt(type, props, ...children) {
 }
 
 document.body.appendChild(
-  elt(
-    "button",
-    { onclick: () => console.log("it worked") },
-    "Update (Use Sparingly)"
-  )
+  elt("button", { onclick: () => syncFromWC() }, "Update (Use Sparingly)")
 );
 
 let ordersTable = elt(
@@ -92,6 +93,10 @@ function totalqty(items) {
 }
 
 db.ref("orders").on("value", (snap) => {
+  console.log("loading Orders");
+  // if (snap.exists()) {
+  //   return;
+  // }
   let orders = snap.val();
   let table = elt("table");
   let row;
@@ -113,34 +118,36 @@ db.ref("orders").on("value", (snap) => {
   document.body.appendChild(table);
 });
 
-// function updateDataFromWC() {
-//   let pages = 0;
-//   fetch(url).then((response) => {
-//     // const apiPromises = [];
-//     //get page count and replace the i<=3 below
-//     pages = response.headers["X-WP-TotalPages"];
-//     console.log(response.headers);
-//     console.log(response.headers["Date"]);
-//     console.log(pages);
-//     for (let i = 1; i <= 3; i++) {
-//       let pageURL = url + "&page=" + i;
-//       fetch(pageURL)
-//         .then((response) => {
-//           return response.json();
-//         })
-//         .then((data) => {
-//           console.log(data);
-//           for (const value of Object.values(data)) {
-//             orders[value.number] = value;
-//           }
-//           db.ref("orders").set(orders);
-//         })
-//         .catch((err) => {
-//           console.log(err);
-//         });
-//     }
-//   });
-// }
+function syncFromWC() {
+  console.log("syncing");
+  dateLastSynced = new Date();
+  let pages = 0;
+  fetch(url).then((response) => {
+    // const apiPromises = [];
+    //get page count and replace the i<=3 below
+    pages = response.headers["X-WP-TotalPages"];
+    console.log(response.headers);
+    console.log(response.headers["Date"]);
+    console.log(pages);
+    for (let i = 1; i <= 3; i++) {
+      let pageURL = url + "&page=" + i;
+      fetch(pageURL)
+        .then((response) => {
+          return response.json();
+        })
+        .then((data) => {
+          console.log(data);
+          for (const value of Object.values(data)) {
+            orders[value.number] = value;
+          }
+          db.ref("orders").set(orders);
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    }
+  });
+}
 
 // const http = new XMLHttpRequest();
 // http.open("GET", url);
