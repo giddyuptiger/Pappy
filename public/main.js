@@ -268,9 +268,14 @@ function gen_pick_table(snap) {
   console.log(pick);
   document.body.appendChild(table);
 }
+function packOrder(id) {
+  console.log("packing Order");
+}
+
 function packItem(id) {
   console.log("packing item");
 }
+
 function gen_pack_table(snap) {
   console.log("generating Pack Table");
   if (!snap) return;
@@ -350,10 +355,11 @@ function gen_pack_table(snap) {
     }
   }
   let packArray = [];
-  for (const customer of Object.values(pack)) {
-    console.log(customer.lineItems);
+  for (const [customer_id, customer] of Object.entries(pack)) {
+    // console.log(customer.lineItems);
     // console.log(item, value);
     let line = [
+      customer_id,
       customer.first_name,
       customer.last_name,
       customer.quantity,
@@ -366,6 +372,7 @@ function gen_pack_table(snap) {
   }
   packArray.sort(sortFunction);
   let headers = [
+    "Packed?",
     "First",
     "Last",
     "Quantity",
@@ -377,11 +384,19 @@ function gen_pack_table(snap) {
   packArray.unshift(headers);
   for (const item of packArray) {
     row = make_tr(
-      String(item[0]),
+      elt(
+        "button",
+        {
+          onclick: packOrder(this.id),
+          id: item[0],
+        },
+        "Pack"
+      ),
       String(item[1]),
       String(item[2]),
-      item[3],
-      String(item[4])
+      String(item[3]),
+      item[4],
+      String(item[5])
     );
     table.appendChild(row);
   }
