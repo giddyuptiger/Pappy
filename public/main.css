@@ -69,6 +69,12 @@ table {
 
 #pick { display: none; }
 
+#sync-products,
+#sync-orders {
+  background-color: rgb(255, 139, 139);
+  /* font-size: 2em; */
+}
+
 /*from fb*/
 body {
   background: #7ca0b8;

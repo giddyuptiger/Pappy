@@ -55,12 +55,35 @@ function elt(type, props, ...children) {
   return element;
 }
 
-// document.body.appendChild(
-//   elt("button", { onclick: () => syncOrders() }, "Sync Orders (Use Sparingly)")
-// );
-// document.body.appendChild(
-//   elt("button", { onclick: () => syncProducts() }, "Sync Products (Use Sparingly)")
-// );
+document.body.insertBefore(
+  elt(
+    "button",
+    { onclick: () => syncOrders(), id: "sync-products" },
+    "Sync Orders (Use Sparingly)"
+  ),
+  document.body.firstChild
+);
+document.body.insertBefore(
+  elt(
+    "button",
+    { onclick: () => syncProducts(), id: "sync-products" },
+    "Sync Products (Use Sparingly)"
+  ),
+  document.body.firstChild
+);
+
+document.body.appendChild(elt("div", { id: "date_orders_synced" }));
+let syncDate = document.getElementById("date_orders_synced");
+db.ref("state").on("value", (snap) => {
+  syncDate.innerHTML = "";
+  let dos = snap.val().date_orders_synced;
+  let dps = snap.val().date_products_synced;
+  dos = new Date(dos);
+  dps = new Date(dps);
+
+  if (dos) syncDate.innerHTML = `Orders Last Synced: ${dos}  `;
+  if (dps) syncDate.innerHTML += `Products Last Synced: ${dps}`;
+});
 
 document.body.appendChild(
   elt(
@@ -268,12 +291,32 @@ function gen_pick_table(snap) {
   console.log(pick);
   document.body.appendChild(table);
 }
+
+let orders_processing_meta = {};
+let pick_meta = {};
+get_meta();
+function get_meta() {
+  console.log("getting meta");
+  db.ref("pick_meta").once("value", (snap) => {
+    pick_meta = snap.val();
+  });
+  db.ref("orders_processing_meta").once("value", (snap) => {
+    orders_processing_meta = snap.val();
+  });
+  console.log(pick_meta);
+  console.log(orders_processing_meta);
+}
+
 function packOrder(id) {
   console.log("packing Order");
+  console.log(id);
+  db.ref(`orders_processing_meta/${id}`).set({ packed: true });
 }
 
 function packItem(id) {
   console.log("packing item");
+  console.log(id);
+  db.ref(`orders_processing_meta/${id}`).set({ packed: true });
 }
 
 function gen_pack_table(snap) {
@@ -297,10 +340,11 @@ function gen_pack_table(snap) {
       // console.log(`${key}:  ${value}`);
       let nme = value.name;
       let qty = value.quantity;
+      let id = value.product_id;
       // orderItems.push([nme, qty]);
       // let itemObj = {};
       // itemObj[nme] = qty;
-      lineItems[key] = { name: nme, quantity: qty };
+      lineItems[key] = { name: nme, quantity: qty, id: id };
       // lineItems += `${qty}x ${nme}\n`;
       orderQuantity += qty;
     }
@@ -309,14 +353,21 @@ function gen_pack_table(snap) {
     for (const value of Object.values(lineItems)) {
       itemTable.appendChild(
         make_tr(
-          elt("button", { onclick: () => packItem(this.id) }, "packed"),
+          elt(
+            "button",
+            {
+              onclick: () => packItem(this.id),
+              id: `${customer_id}/${value.id}`,
+            },
+            "packed"
+          ),
           String(value.quantity),
           String(value.name)
         )
       );
       //  console.log(``);
     }
-    console.log(itemTable);
+    // console.log(itemTable);
     // if (false /*email exists already on another order*/) {
     //   order[email].lineItems += lineItems;
     // }
@@ -343,7 +394,7 @@ function gen_pack_table(snap) {
             String(value.quantity)
           )
         );
-        console.log(pack[customer_id].lineItems);
+        // console.log(pack[customer_id].lineItems);
         //  console.log(``);
       }
       let oldLineItems = pack[order.customer_id].lineItems;
@@ -382,21 +433,23 @@ function gen_pack_table(snap) {
     "Route",
   ];
   packArray.unshift(headers);
-  for (const item of packArray) {
+  for (const order of packArray) {
     row = make_tr(
       elt(
         "button",
         {
-          onclick: packOrder(this.id),
-          id: item[0],
+          onclick: () => {
+            packOrder(this.id);
+          },
+          id: order[0],
         },
         "Pack"
       ),
-      String(item[1]),
-      String(item[2]),
-      String(item[3]),
-      item[4],
-      String(item[5])
+      String(order[1]),
+      String(order[2]),
+      String(order[3]),
+      order[4],
+      String(order[5])
     );
     table.appendChild(row);
   }
@@ -492,7 +545,10 @@ function syncOrders() {
           for (const value of Object.values(data)) {
             orders[value.number] = value;
           }
-          db.ref("orders").set(orders);
+          db.ref("orders").update(orders);
+          db.ref("state").update({
+            date_orders_synced: { ".sv": "timestamp" },
+          });
         })
         .catch((err) => {
           console.log(err);
@@ -525,7 +581,10 @@ function syncProducts() {
           for (const value of Object.values(data)) {
             products[value.id] = value;
           }
-          db.ref("products").set(products);
+          db.ref("products").update(products);
+          db.ref("state").update({
+            date_products_synced: { ".sv": "timestamp" },
+          });
         })
         .catch((err) => {
           console.log(err);
