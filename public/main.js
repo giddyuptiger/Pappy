@@ -143,7 +143,10 @@ function downloadAddresses() {
   exportCSVFile(null, addresses, `Addresses ${date}`);
 }
 
+let orders_processing = {};
 db.ref("orders_processing").on("value", (snap) => {
+  orders_processing = snap.val();
+  console.log("orders processing from firebase: ", orders_processing);
   gen_op_table(snap);
   gen_pick_table(snap);
   gen_pack_table(snap);
@@ -377,6 +380,82 @@ function pickItem(item_id) {
 
 let addresses = [];
 
+let pack = {};
+
+function gen_pack_table(snap) {
+  console.log("generating pack table");
+  if (!snap) return;
+  let orders = snap.val();
+  let table = elt("table");
+  table.className = "table";
+  table.id = "pack";
+  let row;
+  for (const order of Object.values(orders)) {
+    const customer_id = order.customer_id;
+    addresses.push({ addresses: address(order.billing) });
+    let orderQuantity = 0;
+    let lineItems = {};
+  }
+
+  if (currentWeekData[customer_id]) {
+    route = currentWeekData[customer_id].route;
+    note = stringifyNotes(currentWeekData[customer_id].notes);
+    console.log(route, note);
+  }
+  let packOrderButton = elt(
+    "button",
+    {
+      onclick: function () {
+        packOrder(order[0]);
+      },
+      id: order[0],
+    },
+    "Pack"
+  );
+  let routeBox = elt(
+    "div",
+    null,
+    elt("p", null, String(order[7])),
+    elt("input", { id: `${order[0]}/route` }),
+    elt(
+      "button",
+      {
+        onclick: function () {
+          submitRoute(`${order[0]}/route`);
+        },
+      },
+      "Submit Note"
+    )
+  );
+  let noteBox = elt(
+    "div",
+    null,
+    elt("p", null, String(order[8])),
+    elt("input", { id: `${order[0]}/notes` }),
+    elt(
+      "button",
+      {
+        onclick: function () {
+          submitNote(`${order[0]}/notes`);
+        },
+      },
+      "Submit Note"
+    )
+  );
+  row = make_tr(
+    props,
+    packOrderButton,
+    String(order[1]),
+    String(order[2]),
+    String(order[3]),
+    order[4],
+    String(order[5]),
+    String(order[6]),
+    routeBox,
+    noteBox
+  );
+}
+
 function gen_pack_table(snap) {
   console.log("generating Pack Table");
   if (!snap) return;
@@ -394,36 +473,36 @@ function gen_pack_table(snap) {
     addresses.push({ address: address(order.billing) });
     // console.log(addresses);
 
-    if (pack.hasOwnProperty(order.customer_id)) {
-      console.log("second order for customer");
-      console.log(pack[customer_id].lineItems);
-      let newItemsList = pack[customer_id];
-      // let oldLineItems = pack[order.customer_id].lineItems;
-      // let oldQuantity = pack[order.customer_id].quantity;
+    // if (pack.hasOwnProperty(order.customer_id)) {
+    //   console.log("second order for customer");
+    //   console.log(pack[customer_id].lineItems);
+    //   let newItemsList = pack[customer_id];
+    // let oldLineItems = pack[order.customer_id].lineItems;
+    // let oldQuantity = pack[order.customer_id].quantity;
 
-      // console.log(pack[order.customer_id].lineItems);
-      // let oldItems = {};
-      // oldItems = pack[order.customer_id].lineItems;
-      // console.log(oldItems);
-      // for (const value of Object.values(lineItems)) {
-      //   oldItems.appendChild(
-      //     make_tr(
-      //       null,
-      //       elt("button", null),
-      //       String(value.name),
-      //       String(value.quantity)
-      //     )j
-      //   );
-      //   console.log(oldItems);
-      //   pack[order.customer_id].lineItems = oldItems;
-      //   // console.log(pack[customer_id].lineItems);
-      //   //  console.log(``);
-      // }
-      // // console.log("old and new", oldLineItems);
-      // pack[order.customer_id].lineItems = oldLineItems + lineItems;
-      // pack[order.customer_id].quantity += orderQuantity;
-      // console.log(pack[order.customer_id].lineItems);
-    }
+    // console.log(pack[order.customer_id].lineItems);
+    // let oldItems = {};
+    // oldItems = pack[order.customer_id].lineItems;
+    // console.log(oldItems);
+    // for (const value of Object.values(lineItems)) {
+    //   oldItems.appendChild(
+    //     make_tr(
+    //       null,
+    //       elt("button", null),
+    //       String(value.name),
+    //       String(value.quantity)
+    //     )j
+    //   );
+    //   console.log(oldItems);
+    //   pack[order.customer_id].lineItems = oldItems;
+    //   // console.log(pack[customer_id].lineItems);
+    //   //  console.log(``);
+    // }
+    // // console.log("old and new", oldLineItems);
+    // pack[order.customer_id].lineItems = oldLineItems + lineItems;
+    // pack[order.customer_id].quantity += orderQuantity;
+    // console.log(pack[order.customer_id].lineItems);
+    // }
 
     for (const [key, value] of Object.entries(order.line_items)) {
       // if (!pick.[item.name]) Object.assign(pickitem.[item.name])
@@ -550,58 +629,62 @@ function gen_pack_table(snap) {
   for (const order of packArray) {
     let props = { class: "r" };
     if (currentWeekData1[order[0]]) {
-      props = { class: currentWeekData1[order[0]].packed ? "packed" : "" };
+      props = { class: currentWeekData1[order[0]].packed ? "packed" : "ss" };
     }
     // let orderNote = notes[customer_id]
-    row = make_tr(
-      props,
+    let packOrderButton = elt(
+      "button",
+      {
+        onclick: function () {
+          packOrder(order[0]);
+        },
+        id: order[0],
+      },
+      "Pack"
+    );
+    let routeBox = elt(
+      "div",
+      null,
+      elt("p", null, String(order[7])),
+      elt("input", { id: `${order[0]}/route` }),
       elt(
         "button",
         {
           onclick: function () {
-            packOrder(this.id);
+            submitRoute(`${order[0]}/route`);
           },
-          id: order[0],
         },
-        "Pack"
-      ),
+        "Submit Note"
+      )
+    );
+    let noteBox = elt(
+      "div",
+      null,
+      elt("p", null, String(order[8])),
+      elt("input", { id: `${order[0]}/notes` }),
+      elt(
+        "button",
+        {
+          onclick: function () {
+            submitNote(`${order[0]}/notes`);
+          },
+        },
+        "Submit Note"
+      )
+    );
+    row = make_tr(
+      props,
+      packOrderButton,
       String(order[1]),
       String(order[2]),
       String(order[3]),
       order[4],
       String(order[5]),
       String(order[6]),
-      elt(
-        "div",
-        null,
-        elt("p", null, String(order[7])),
-        elt("input", { id: `${order[0]}/route` }),
-        elt(
-          "button",
-          {
-            onclick: function () {
-              submitRoute(`${order[0]}/route`);
-            },
-          },
-          "Submit Note"
-        )
-      ),
-      elt(
-        "div",
-        null,
-        elt("p", null, String(order[8])),
-        elt("input", { id: `${order[0]}/notes` }),
-        elt(
-          "button",
-          {
-            onclick: function () {
-              submitNote(`${order[0]}/notes`);
-            },
-          },
-          "Submit Note"
-        )
-      )
+      routeBox,
+      noteBox
     );
+    // row.class = currentWeekData1[order[0]].packed ? "packed" : "";
 
     if (order[1] === "First") {
       row = make_tr(
