@@ -1,7 +1,8 @@
 const db = firebase.database();
-const orders = {};
-const orders_processing = {};
-const currentWeekData = {};
+let orders = {};
+let orders_processing = {};
+let currentWeekData = {};
+let orders_next_week = {};
 // function fetchOrders() {
 // const ck = "ck_e7a75e598b9551db54b160750153656c0d985ef1";
 // const cs = "cs_b341a298a50106f4756c5b62c03f47b2ea9a1ceb";
@@ -23,14 +24,56 @@ let subsURL = `${
 }subscriptions?consumer_key=${ck}&consumer_secret=${cs}&per_page=100`;
 console.log(url);
 
-//CALCULATE CURRENT WEEK as Week of Monday '##/##/####' 
+const mons = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+const das = ["Sun", "Mon", "Tues", "Wed", "Thurs", "Fri", "Sat"];
+
+const months = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+const days = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+//CALCULATE CURRENT WEEK as Week of Monday '##/##/####'
 let currentweek = calcCurrentweek();
 
 // //GET KEYS
 // db.ref("admin/auth")
 //   .once("value", (snap) => {
-  //     // console.log(snap);
-  //     console.log(snap.val());
+//     // console.log(snap);
+//     console.log(snap.val());
 //     let data = snap.val();
 //     return data;
 //   })
@@ -42,7 +85,6 @@ let currentweek = calcCurrentweek();
 //     orders?consumer_key=${ck}&consumer_secret=${cs}&per_page=100`;
 //     console.log(url);
 //   });
-
 
 //SYNC BUTTONS
 document.body.insertBefore(
@@ -77,17 +119,24 @@ db.ref("state").on("value", (snap) => {
   if (dps) syncDate.innerHTML += `Products Last Synced: ${dps}`;
 });
 
-
-//LISTENER - CURRENT_WEEK_DATA 
+//LISTENER - CURRENT_WEEK_DATA
+//need to update weeks node to be 'Deliveries
 db.ref(`weeks/${currentweek}`).on("value", (snap) => {
   currentWeekData = snap.val();
-  console.log(currentWeekData);
+  console.log("currentWeekData DOWBNLOADED From Firebase: ", currentWeekData);
+  gen_op_table(snap);
+  gen_pick_table(snap);
+  gen_pack_table(snap);
+  gen_cust_table(snap);
 });
 
-//LISTENER - ORDERS_PROCESSING 
+//LISTENER - ORDERS_PROCESSING
 db.ref("orders_processing").on("value", (snap) => {
   orders_processing = snap.val();
-  console.log("orders processing from firebase: ", orders_processing);
+  console.log(
+    "orders_processing DOWNLOADED From Firebase: ",
+    orders_processing
+  );
   gen_op_table(snap);
   gen_pick_table(snap);
   gen_pack_table(snap);
@@ -96,7 +145,9 @@ db.ref("orders_processing").on("value", (snap) => {
 
 //LISTENER - ORDERS NEXT WEEK Do i neeed this?
 db.ref("orders_next_week").on("value", (snap) => {
-  if (snap.exists()) gen_onw_table(snap);
+  orders_next_week = snap.val();
+  console.log("orders_next_week DOWNLOADED From Firebase: ", orders_next_week);
+  gen_onw_table(orders_next_week);
 });
 
 //TAB BUTTONS
@@ -125,8 +176,8 @@ document.body.appendChild(
     "button",
     { onclick: () => show_table("orders_next_week") },
     "Orders - Next Week"
-    )
-    );
+  )
+);
 
 //DOWNLOAD CSV OF ADDRESS
 function downloadAddresses() {
@@ -153,21 +204,21 @@ function calcCutoff() {
   else if (date.getDay() === 1) console.log("Today is monday");
   else date.setDate(date.getDate() - date.getDay() - 1);
   date.setHours(14, 0, 0, 0);
-  console.log('Cutoff Date was: ', formatSyncDate(date));
+  console.log("Cutoff Date was: ", formatSyncDate(date));
   return date;
 }
 
-function calcCurrentweek () {
+function calcCurrentweek() {
   let date = new Date();
   toBoulderTime(date);
   if (date.getDay() === 0) date.setDate(date.getDate() - 6);
   else if (date.getDay() === 1) console.log("Today is monday");
   else date.setDate(date.getDate() - date.getDay() - 1);
-  let month = String(date.getMonth() + 1).padStart(2, '0');
-  let date = String(date.getDate()).padStart(2, '0');
+  let month = String(date.getMonth() + 1).padStart(2, "0");
+  let dayOfMonth = String(date.getDate()).padStart(2, "0");
   let year = String(date.getFullYear());
-  let string = `${month}/${day}/${year}`
-  console.log('Current week: ', string);
+  let string = `${month}/${dayOfMonth}/${year}`;
+  console.log("Current week: ", string);
   return string;
 }
 
@@ -181,13 +232,14 @@ function toBoulderTime(date) {
 
 //GENERATE HTML TABLES
 //TABLE - ORDERS_PROCESSING
-function gen_op_table(snap) {
+function gen_op_table() {
+  if (!orders_processing) return;
   console.log("generating Orders- Processing Table");
   // if (snap.exists()) {
   //   return;
   // }
-  if (!snap) return;
-  let orders = snap.val();
+  // if (!snap) return;
+  let orders = orders_processing;
   let table = elt("table");
   table.className = "table";
   table.id = "orders_processing";
@@ -223,11 +275,13 @@ function gen_op_table(snap) {
   }
   document.body.appendChild(table);
 }
+
 //TABLE - ORDERS_NEXT_WEEK
-function gen_onw_table(snap) {
+function gen_onw_table() {
   console.log("generating Orders_Next_week table");
+  if (!orders_next_week) return;
   // if (!snap) return;
-  let orders = snap.val();
+  let orders = orders_next_week;
   console.log(orders);
   let table = elt("table");
   table.className = "table";
@@ -285,10 +339,11 @@ function gen_onw_table(snap) {
 }
 
 //TABLE - PICK TABLE
-function gen_pick_table(snap) {
+function gen_pick_table() {
   console.log("generating Pick Table");
-  if (!snap) return;
-  let orders = snap.val();
+  if (!orders_processing) return;
+  // if (!snap) return;
+  let orders = orders_processing;
   let pick = {};
   let table = elt("table");
   table.className = "table";
@@ -297,12 +352,6 @@ function gen_pick_table(snap) {
   for (const order of Object.values(orders)) {
     // console.log(new Date(order.date_created));
     // console.log(order.date_created);
-    let created = new Date(order.date_created);
-
-    if (created > cutoff) {
-      console.log("too old");
-      continue;
-    }
     for (const item of Object.values(order.line_items)) {
       // if (!pick.[item.name]) Object.assign(pickitem.[item.name])
       // console.log(item.name, item.quantity);
@@ -347,10 +396,11 @@ function gen_pick_table(snap) {
 }
 
 //TABLE - PACK TABLE
-function gen_pack_table(snap) {
+function gen_pack_table() {
   console.log("generating pack table");
-  if (!snap) return;
-  let orders = snap.val();
+  if (!orders_processing) return;
+  // if (!snap) return;
+  let orders = orders_processing;
   let table = elt("table");
   table.className = "table";
   table.id = "pack";
@@ -362,31 +412,30 @@ function gen_pack_table(snap) {
     let lineItems = {};
     //create items object
     let theseItems = {};
-    let orderQuantity = 0;
     for (const [key, value] of Object.entries(order)) {
       theseItems[key] = {
         name: value.name,
         quantity: value.quantity,
-        product_id: value.product_id
-      }
+        product_id: value.product_id,
+      };
       orderQuantity += value.quantity;
     }
-    //if customer_id already ahs order on pack list then add items to existing items Object.assign()
-    if(pack[customer_id]) {
-      Object.assign(pack[customer_id].items, theseItems
+    //if customer_id already has order on pack list then add items to existing items Object.assign()
+    if (pack[customer_id]) {
+      Object.assign(pack[customer_id].items, theseItems);
     }
     //add order to pack list if not already exists
     pack[customer_id] = {
-        first_name: order.billing.first_name,
-        last_name: order.billing.last_name,
-        address: address(order.billing),
-        lineItems: theseItems,
-        quantity: orderQuantity,
-        total: order.total,
-        customer_note: order.customer_note,
-        route: 'No Route Yet',
-        notes: ''
-    }
+      first_name: order.billing.first_name,
+      last_name: order.billing.last_name,
+      address: address(order.billing),
+      lineItems: theseItems,
+      quantity: orderQuantity,
+      total: order.total,
+      customer_note: order.customer_note,
+      route: "No Route Yet",
+      notes: "",
+    };
   }
 
   if (currentWeekData[customer_id]) {
@@ -448,10 +497,11 @@ function gen_pack_table(snap) {
   );
 }
 
-function gen_pack_table_old(snap) {
+//OLD TABLE - PACK TABLE OLD
+function gen_pack_table_old() {
   console.log("generating Pack Table");
-  if (!snap) return;
-  let orders = snap.val();
+  // if (!snap) return;
+  let orders = orders_processing;
   let pack = {};
   let table = elt("table");
   table.className = "table";
@@ -699,6 +749,39 @@ function gen_pack_table_old(snap) {
   document.body.appendChild(table);
 }
 
+//TABLE - CUST TABLE
+function gen_cust_table(snap) {
+  console.log("generating cust Table");
+  if (!orders_processing) return;
+  // if (!snap) return;
+  let orders = snap.val();
+  let pick = {};
+  let table = elt("table");
+  table.className = "table";
+  table.id = "cust";
+  let row;
+  for (const order of Object.values(orders)) {
+    for (const item of Object.values(order.line_items)) {
+      // if (!pick.[item.name]) Object.assign(pickitem.[item.name])
+      // console.log(item.name, item.quantity);
+      let nme = item.name;
+      let qty = item.quantity;
+      let itemObj = {};
+      itemObj[nme] = qty;
+      // console.log(itemObj);
+      if (!pick.hasOwnProperty(item.name)) Object.assign(pick, itemObj);
+      else pick[item.name] += item.quantity;
+    }
+  }
+  for (const [item, value] of Object.entries(pick)) {
+    // console.log(item, value);
+    row = make_tr(null, item, String(value));
+    table.appendChild(row);
+  }
+  console.log(pick);
+  document.body.appendChild(table);
+}
+
 // let orders_processing_meta = {};
 // let pick_meta = {};
 // get_meta();
@@ -737,7 +820,6 @@ let addresses = [];
 
 let pack = {};
 
-
 function submitNote(id) {
   const note = document.getElementById(id).value;
   // console.log("note")/;
@@ -749,45 +831,13 @@ function submitRoute(id) {
   db.ref(`weeks/${currentweek}/${id}`).set(route);
 }
 
-function gen_cust_table(snap) {
-  console.log("generating cust Table");
-
-  if (!snap) return;
-  let orders = snap.val();
-  let pick = {};
-  let table = elt("table");
-  table.className = "table";
-  table.id = "cust";
-  let row;
-  for (const order of Object.values(orders)) {
-    for (const item of Object.values(order.line_items)) {
-      // if (!pick.[item.name]) Object.assign(pickitem.[item.name])
-      // console.log(item.name, item.quantity);
-      let nme = item.name;
-      let qty = item.quantity;
-      let itemObj = {};
-      itemObj[nme] = qty;
-      // console.log(itemObj);
-      if (!pick.hasOwnProperty(item.name)) Object.assign(pick, itemObj);
-      else pick[item.name] += item.quantity;
-    }
-  }
-  for (const [item, value] of Object.entries(pick)) {
-    // console.log(item, value);
-    row = make_tr(null, item, String(value));
-    table.appendChild(row);
-  }
-  console.log(pick);
-  document.body.appendChild(table);
-}
-
-
 function syncOrders() {
-  console.log("syncing orders");
+  console.log("SYNCING ORDERS BIG UPLOAD (FREE)");
   dateLastSynced = new Date();
   let pages = 0;
+  let downloadedOrders = {};
   fetch(url).then((response) => {
-    // const apiPromises = [];
+    const apiPromises = [];
     //get page count and replace the i<=3 below
     pages = response.headers["X-WP-TotalPages"];
     console.log(response.headers);
@@ -795,32 +845,37 @@ function syncOrders() {
     console.log(pages);
     for (let i = 1; i <= 3; i++) {
       let pageURL = url + "&page=" + i;
-      fetch(pageURL)
-        .then((response) => {
-          return response.json();
-        })
-        .then((data) => {
-          console.log(data);
-          for (const value of Object.values(data)) {
-            orders[value.number] = value;
-          }
-          db.ref("orders").update(orders);
-          db.ref("state").update({
-            date_orders_synced: { ".sv": "timestamp" },
-          });
-          alert("done syncing");
-        })
-        .catch((err) => {
-          console.log(err);
-        });
+      apiPromises.push(
+        fetch(pageURL)
+          .then((response) => {
+            return response.json();
+          })
+          .then((data) => {
+            console.log("got page from Woo");
+            for (const value of Object.values(data)) {
+              downloadedOrders[value.number] = value;
+            }
+          })
+          .catch((err) => {
+            console.log(err);
+          })
+      );
     }
+    Promise.all(apiPromises).then(() => {
+      console.log(downloadedOrders);
+      db.ref("orders").update(downloadedOrders);
+      db.ref("state").update({
+        date_orders_synced: { ".sv": "timestamp" },
+      });
+      generate_orders_processing(downloadedOrders);
+      alert("Done Syncing Orders");
+    });
   });
 }
-console.log("done running");
 
 function syncProducts() {
   const products = {};
-  console.log("syncing products");
+  console.log("SYNCING PRODUCTS BIG UPLOAD (FREE)");
   //do this to get product tags for class
   dateLastSynced = new Date();
   let pages = 0;
@@ -857,30 +912,37 @@ function syncProducts() {
 // db.ref("orders").once("value", (snap) => {
 //   generate_orders_processing(snap);
 // });
-function generate_orders_processing() {
-  db.ref("orders").once("value", (snap) => {
-    const orders_processing = {};
-    const orders_next_week = {};
-    console.log("creating processing orders list"); //FIX:shouldn't have to recreate and rewrite this on every page open
-    let orders = snap.val();
-    for (const order of Object.values(orders)) {
-      // console.log(order.status);
-
-      let createdDate = new Date(order.date_created);
-      if (order.status == "processing") {
-        if (createdDate < cutoff || currentWeekData[order.customer_id].bump) {
-          orders_processing[order.number] = order;
-          // console.log(order.number, " this week");
-        } else {
-          orders_next_week[order.number] = order;
-          // console.log(order.number, " next week");
-        }
+function generate_orders_processing(downloadedOrders) {
+  // db.ref("orders").once("value", (snap) => {
+  // console.log("DOWNLOADING ORDERS (EXPENSIVE)");
+  const orders_processing = {};
+  const orders_next_week = {};
+  console.log("creating processing orders list"); //FIX:shouldn't have to recreate and rewrite this on every page open
+  // let orders = snap.val();
+  for (const order of Object.values(downloadedOrders)) {
+    let createdDate = new Date(order.date_created);
+    if (order.status == "processing") {
+      if (
+        createdDate < cutoff ||
+        (currentWeekData != undefined &&
+          currentWeekData[order.customer_id].bump)
+      ) {
+        orders_processing[order.number] = order;
+        // console.log(order.number, " this week");
+      } else {
+        orders_next_week[order.number] = order;
+        // console.log(order.number, " next week");
       }
     }
-    console.log(orders_processing, orders_next_week);
-    db.ref("orders_processing").set(orders_processing);
-    db.ref("orders_next_week").set(orders_next_week);
-  });
+  }
+  console.log("orders_processing: ");
+  console.log(orders_processing);
+  console.log("\norders_next_week: ");
+  console.log(orders_next_week);
+  db.ref("orders_processing").set(orders_processing);
+  db.ref("orders_next_week").set(orders_next_week);
+  console.log("SET NEW ORDERS_PROCESSING AND NEXT WEEK");
+  // });
 }
 
 // function generate_orders_processing(snap) {
@@ -1040,17 +1102,21 @@ function stringifyNotes(notes) {
 
 function formatSyncDate(date) {
   date = new Date(date);
+  //DATE
   let dayow = days[date.getDay()];
-  let month = date.getMonth() + 1;
-  let day = date.getDate();
-  let time =
-    (date.getHours() > 12 ? date.getHours() - 12 : date.getHours()) +
-    ":" +
-    date.getMinutes();
-
+  let month = String(date.getMonth() + 1).padStart(2, "0");
+  let day = String(date.getDate()).padStart(2, "0");
+  //TIME
+  let hours = date.getHours();
+  let minutes = String(date.getMinutes()).padStart(2, "0");
   let a_p = "am";
-  if (date.getHours() > 12) a_p = "pm";
-  let string = `${month}/${day} ${dayow} ${time}${a_p}`;
+  if (hours > 12) {
+    a_p = "pm";
+    hours -= 12;
+  }
+  let time = hours + ":" + minutes + a_p;
+  //ASSEMBLE
+  let string = `${month}/${day} ${dayow} ${time}`;
   return string;
 }
 
@@ -1128,45 +1194,3 @@ function exportCSVFile(headers, items, fileTitle) {
   itemsFormatted = [];
   hide(invoiceModal);
 }
-
-const mons = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
-const das = ["Sun", "Mon", "Tues", "Wed", "Thurs", "Fri", "Sat"];
-
-const months = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-const days = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
