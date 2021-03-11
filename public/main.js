@@ -1,5 +1,7 @@
 const db = firebase.database();
 const orders = {};
+const orders_processing = {};
+const currentWeekData = {};
 // function fetchOrders() {
 // const ck = "ck_e7a75e598b9551db54b160750153656c0d985ef1";
 // const cs = "cs_b341a298a50106f4756c5b62c03f47b2ea9a1ceb";
@@ -21,17 +23,14 @@ let subsURL = `${
 }subscriptions?consumer_key=${ck}&consumer_secret=${cs}&per_page=100`;
 console.log(url);
 
-// let options = {
-//   method: "GET",
-//   "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-//   muteHttpExceptions: true,
-// };
-// asdsa;
+//CALCULATE CURRENT WEEK as Week of Monday '##/##/####' 
+let currentweek = calcCurrentweek();
 
+// //GET KEYS
 // db.ref("admin/auth")
 //   .once("value", (snap) => {
-//     // console.log(snap);
-//     console.log(snap.val());
+  //     // console.log(snap);
+  //     console.log(snap.val());
 //     let data = snap.val();
 //     return data;
 //   })
@@ -44,6 +43,8 @@ console.log(url);
 //     console.log(url);
 //   });
 
+
+//SYNC BUTTONS
 document.body.insertBefore(
   elt(
     "button",
@@ -61,9 +62,11 @@ document.body.insertBefore(
   document.body.firstChild
 );
 
+//SYNC DATES
 document.body.appendChild(elt("div", { id: "date_orders_synced" }));
 let syncDate = document.getElementById("date_orders_synced");
 
+//STATE LISTENER
 db.ref("state").on("value", (snap) => {
   syncDate.innerHTML = "";
   let dos = snap.val().date_orders_synced;
@@ -72,24 +75,31 @@ db.ref("state").on("value", (snap) => {
   dps = formatSyncDate(toBoulderTime(dps));
   if (dos) syncDate.innerHTML = `Orders Last Synced: ${dos} -  `;
   if (dps) syncDate.innerHTML += `Products Last Synced: ${dps}`;
-
-  // let date = new Date();
-  // let currentWeek =
 });
 
-//Initialize db
-// db.ref().once('value', (snap) => {
 
-// });
-
-let currentWeekData = {};
-let currentweek = "week1";
+//LISTENER - CURRENT_WEEK_DATA 
 db.ref(`weeks/${currentweek}`).on("value", (snap) => {
   currentWeekData = snap.val();
   console.log(currentWeekData);
-  // console.log(stringifyNotes(currentWeekData[121].notes));
 });
 
+//LISTENER - ORDERS_PROCESSING 
+db.ref("orders_processing").on("value", (snap) => {
+  orders_processing = snap.val();
+  console.log("orders processing from firebase: ", orders_processing);
+  gen_op_table(snap);
+  gen_pick_table(snap);
+  gen_pack_table(snap);
+  gen_cust_table(snap);
+});
+
+//LISTENER - ORDERS NEXT WEEK Do i neeed this?
+db.ref("orders_next_week").on("value", (snap) => {
+  if (snap.exists()) gen_onw_table(snap);
+});
+
+//TAB BUTTONS
 document.body.appendChild(
   elt("button", { onclick: () => show_table("pack") }, "PACK")
 );
@@ -115,21 +125,10 @@ document.body.appendChild(
     "button",
     { onclick: () => show_table("orders_next_week") },
     "Orders - Next Week"
-  )
-);
+    )
+    );
 
-// document.body.appendChild(
-//   elt(
-//     "button",
-//     {
-//       onclick: function () {
-//         downloadAddresses();
-//       },
-//     },
-//     "Download Addresses CSV"
-//   )
-// );
-
+//DOWNLOAD CSV OF ADDRESS
 function downloadAddresses() {
   console.log("downloading address in CSV");
   let date = new Date();
@@ -143,20 +142,45 @@ function downloadAddresses() {
   exportCSVFile(null, addresses, `Addresses ${date}`);
 }
 
-let orders_processing = {};
-db.ref("orders_processing").on("value", (snap) => {
-  orders_processing = snap.val();
-  console.log("orders processing from firebase: ", orders_processing);
-  gen_op_table(snap);
-  gen_pick_table(snap);
-  gen_pack_table(snap);
-  gen_cust_table(snap);
-});
+//DATES
+let today = new Date();
+let cutoff = calcCutoff();
 
-db.ref("orders_next_week").on("value", (snap) => {
-  if (snap.exists()) gen_onw_table(snap);
-});
+function calcCutoff() {
+  let date = new Date();
+  toBoulderTime(date);
+  if (date.getDay() === 0) date.setDate(date.getDate() - 6);
+  else if (date.getDay() === 1) console.log("Today is monday");
+  else date.setDate(date.getDate() - date.getDay() - 1);
+  date.setHours(14, 0, 0, 0);
+  console.log('Cutoff Date was: ', formatSyncDate(date));
+  return date;
+}
 
+function calcCurrentweek () {
+  let date = new Date();
+  toBoulderTime(date);
+  if (date.getDay() === 0) date.setDate(date.getDate() - 6);
+  else if (date.getDay() === 1) console.log("Today is monday");
+  else date.setDate(date.getDate() - date.getDay() - 1);
+  let month = String(date.getMonth() + 1).padStart(2, '0');
+  let date = String(date.getDate()).padStart(2, '0');
+  let year = String(date.getFullYear());
+  let string = `${month}/${day}/${year}`
+  console.log('Current week: ', string);
+  return string;
+}
+
+function toBoulderTime(date) {
+  date = new Date(date);
+  if (date.getTimezoneOffset() != 420) {
+    date.setHours(date.getHours() - (date.getTimezoneOffset() - 420) / 60);
+  }
+  return date;
+}
+
+//GENERATE HTML TABLES
+//TABLE - ORDERS_PROCESSING
 function gen_op_table(snap) {
   console.log("generating Orders- Processing Table");
   // if (snap.exists()) {
@@ -199,7 +223,7 @@ function gen_op_table(snap) {
   }
   document.body.appendChild(table);
 }
-
+//TABLE - ORDERS_NEXT_WEEK
 function gen_onw_table(snap) {
   console.log("generating Orders_Next_week table");
   // if (!snap) return;
@@ -260,29 +284,7 @@ function gen_onw_table(snap) {
   document.body.appendChild(table);
 }
 
-let today = new Date();
-let cutoff = calcCutoff();
-
-function calcCutoff() {
-  let date = new Date();
-  console.log(date);
-  if (date.getDay() === 0) date.setDate(date.getDate() - 6);
-  else if (date.getDay() === 1) console.log("Today is monday");
-  else date.setDate(date.getDate() - date.getDay() - 1);
-  date.setHours(14, 0, 0, 0);
-  toBoulderTime(date);
-  console.log(date);
-  return date;
-}
-
-function toBoulderTime(date) {
-  date = new Date(date);
-  if (date.getTimezoneOffset() != 420) {
-    date.setHours(date.getHours() - (date.getTimezoneOffset() - 420) / 60);
-  }
-  return date;
-}
-
+//TABLE - PICK TABLE
 function gen_pick_table(snap) {
   console.log("generating Pick Table");
   if (!snap) return;
@@ -344,44 +346,7 @@ function gen_pick_table(snap) {
   document.body.appendChild(table);
 }
 
-let orders_processing_meta = {};
-let pick_meta = {};
-get_meta();
-function get_meta() {
-  console.log("getting meta");
-  db.ref("pick_meta").once("value", (snap) => {
-    pick_meta = snap.val();
-  });
-  db.ref("orders_processing_meta").once("value", (snap) => {
-    orders_processing_meta = snap.val();
-  });
-  console.log(pick_meta);
-  console.log(orders_processing_meta);
-}
-
-function packOrder(id) {
-  console.log("packing Order");
-  console.log(id);
-  db.ref(`weeks/${currentweek}/${id}`).update({ packed: true });
-}
-
-function packItem(customer_id, item_id) {
-  console.log("packing item:");
-  console.log(customer_id, item_id);
-  db.ref(`weeks/${currentweek}/${customer_id}/items/${item_id}`).update({
-    packed: true,
-  });
-}
-
-function pickItem(item_id) {
-  console.log("picking item");
-  db.ref(`weeks/${currentweek}/pickList/${item_id}`).update({ picked: true });
-}
-
-let addresses = [];
-
-let pack = {};
-
+//TABLE - PACK TABLE
 function gen_pack_table(snap) {
   console.log("generating pack table");
   if (!snap) return;
@@ -395,6 +360,33 @@ function gen_pack_table(snap) {
     addresses.push({ addresses: address(order.billing) });
     let orderQuantity = 0;
     let lineItems = {};
+    //create items object
+    let theseItems = {};
+    let orderQuantity = 0;
+    for (const [key, value] of Object.entries(order)) {
+      theseItems[key] = {
+        name: value.name,
+        quantity: value.quantity,
+        product_id: value.product_id
+      }
+      orderQuantity += value.quantity;
+    }
+    //if customer_id already ahs order on pack list then add items to existing items Object.assign()
+    if(pack[customer_id]) {
+      Object.assign(pack[customer_id].items, theseItems
+    }
+    //add order to pack list if not already exists
+    pack[customer_id] = {
+        first_name: order.billing.first_name,
+        last_name: order.billing.last_name,
+        address: address(order.billing),
+        lineItems: theseItems,
+        quantity: orderQuantity,
+        total: order.total,
+        customer_note: order.customer_note,
+        route: 'No Route Yet',
+        notes: ''
+    }
   }
 
   if (currentWeekData[customer_id]) {
@@ -456,7 +448,7 @@ function gen_pack_table(snap) {
   );
 }
 
-function gen_pack_table(snap) {
+function gen_pack_table_old(snap) {
   console.log("generating Pack Table");
   if (!snap) return;
   let orders = snap.val();
@@ -707,6 +699,45 @@ function gen_pack_table(snap) {
   document.body.appendChild(table);
 }
 
+// let orders_processing_meta = {};
+// let pick_meta = {};
+// get_meta();
+// function get_meta() {
+//   console.log("getting meta");
+//   db.ref("pick_meta").once("value", (snap) => {
+//     pick_meta = snap.val();
+//   });
+//   db.ref("orders_processing_meta").once("value", (snap) => {
+//     orders_processing_meta = snap.val();
+//   });
+//   console.log(pick_meta);
+//   console.log(orders_processing_meta);
+// }
+
+function packOrder(id) {
+  console.log("packing Order");
+  console.log(id);
+  db.ref(`weeks/${currentweek}/${id}`).update({ packed: true });
+}
+
+function packItem(customer_id, item_id) {
+  console.log("packing item:");
+  console.log(customer_id, item_id);
+  db.ref(`weeks/${currentweek}/${customer_id}/items/${item_id}`).update({
+    packed: true,
+  });
+}
+
+function pickItem(item_id) {
+  console.log("picking item");
+  db.ref(`weeks/${currentweek}/pickList/${item_id}`).update({ picked: true });
+}
+
+let addresses = [];
+
+let pack = {};
+
+
 function submitNote(id) {
   const note = document.getElementById(id).value;
   // console.log("note")/;
@@ -750,38 +781,6 @@ function gen_cust_table(snap) {
   document.body.appendChild(table);
 }
 
-// function addItem(name, quantity) {
-//   if (!item.name) Object.assign(pick);
-// }
-// function addItem(name, quantity) {
-//   if (!item.name) Object.assign(pick);
-// }
-
-// function gen_pack_table(snap) {
-//   console.log("Generating Pack Table");
-//   if (!snap) return;
-//   let orders = snap.val();
-//   let table = elt("table");
-//   table.className = "table";
-//   table.id = "orders_processing";
-//   let row;
-//   for (const order of Object.values(orders)) {
-//     row = make_tr(
-//       order.number,
-//       order.billing.first_name,
-//       order.billing.last_name,
-//       address(order.billing),
-//       order.billing.phone,
-//       order.billing.email,
-//       order.customer_note,
-//       // items(order.line_items),
-//       // totalqty(order.line_items),
-//       order.total
-//     );
-//     table.appendChild(row);
-//   }
-//   document.body.appendChild(table);
-// }
 
 function syncOrders() {
   console.log("syncing orders");
@@ -855,19 +854,6 @@ function syncProducts() {
   });
 }
 
-// function oops() {
-//   db.ref("orders").on("value", (snap) => {
-//     snap.val();
-//     let yes;
-//     // db.ref(`weeks/${currentweek}`).on("value", () => {
-//     //   yes = false;
-//     // });
-//     console.log("oopsing");
-//     if (yes) generate_orders_processing(snap);
-//     console.log("done opopsing");
-//   });
-// }
-
 // db.ref("orders").once("value", (snap) => {
 //   generate_orders_processing(snap);
 // });
@@ -927,7 +913,7 @@ function generate_orders_processing() {
 //   db.ref("orders_next_week").set(orders_next_week);
 // }
 
-function gen_pick() {}
+// function gen_pick() {}
 
 function show_table(id) {
   console.log(`showing: ${id}`);
