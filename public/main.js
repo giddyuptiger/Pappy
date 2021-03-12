@@ -180,8 +180,8 @@ db.ref("orders_processing").on("value", (snap) => {
 function gen_tables(orders_processing, currentWeekData) {
   gen_op_table();
   gen_pick_table();
-  gen_pack_table();
-  gen_cust_table();
+  // gen_pack_table();
+  // gen_cust_table();
 }
 
 //LISTENER - ORDERS NEXT WEEK Do i neeed this?
@@ -234,6 +234,7 @@ function gen_op_table() {
     );
     table.appendChild(row);
   }
+  console.log(table);
   document.getElementById("op_div").appendChild(table);
 }
 
@@ -358,7 +359,7 @@ function gen_pick_table() {
         "button",
         {
           onclick: function () {
-            pickItem();
+            pickItem(item[0]);
           },
         },
         "Picked"
@@ -474,7 +475,7 @@ function gen_pack_table() {
     routeBox,
     noteBox
   );
-  document.getElementById("pack_div");
+  document.getElementById("pack_div").appendChild(table);
 }
 
 //OLD TABLE - PACK TABLE OLD
