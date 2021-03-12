@@ -66,8 +66,12 @@ const days = [
   "Saturday",
 ];
 
+//DATES
+let today = new Date();
+let cutoff = calcCutoff();
 //CALCULATE CURRENT WEEK as Week of Monday '##/##/####'
 let currentweek = calcCurrentweek();
+let nextWeek = calcNextWeek();
 
 // //GET KEYS
 // db.ref("admin/auth")
@@ -108,48 +112,6 @@ document.body.insertBefore(
 document.body.appendChild(elt("div", { id: "date_orders_synced" }));
 let syncDate = document.getElementById("date_orders_synced");
 
-//STATE LISTENER
-db.ref("state").on("value", (snap) => {
-  syncDate.innerHTML = "";
-  let dos = snap.val().date_orders_synced;
-  let dps = snap.val().date_products_synced;
-  dos = formatSyncDate(toBoulderTime(dos));
-  dps = formatSyncDate(toBoulderTime(dps));
-  if (dos) syncDate.innerHTML = `Orders Last Synced: ${dos} -  `;
-  if (dps) syncDate.innerHTML += `Products Last Synced: ${dps}`;
-});
-
-//LISTENER - CURRENT_WEEK_DATA
-//need to update weeks node to be 'Deliveries
-db.ref(`weeks/${currentweek}`).on("value", (snap) => {
-  currentWeekData = snap.val();
-  console.log("currentWeekData DOWBNLOADED From Firebase: ", currentWeekData);
-  gen_op_table(snap);
-  gen_pick_table(snap);
-  gen_pack_table(snap);
-  gen_cust_table(snap);
-});
-
-//LISTENER - ORDERS_PROCESSING
-db.ref("orders_processing").on("value", (snap) => {
-  orders_processing = snap.val();
-  console.log(
-    "orders_processing DOWNLOADED From Firebase: ",
-    orders_processing
-  );
-  gen_op_table(snap);
-  gen_pick_table(snap);
-  gen_pack_table(snap);
-  gen_cust_table(snap);
-});
-
-//LISTENER - ORDERS NEXT WEEK Do i neeed this?
-db.ref("orders_next_week").on("value", (snap) => {
-  orders_next_week = snap.val();
-  console.log("orders_next_week DOWNLOADED From Firebase: ", orders_next_week);
-  gen_onw_table(orders_next_week);
-});
-
 //TAB BUTTONS
 document.body.appendChild(
   elt("button", { onclick: () => show_table("pack") }, "PACK")
@@ -179,67 +141,66 @@ document.body.appendChild(
   )
 );
 
-//DOWNLOAD CSV OF ADDRESS
-function downloadAddresses() {
-  console.log("downloading address in CSV");
-  let date = new Date();
-  date = formatSyncDate(date);
-  // console.log(date);
-  let addresses;
-  db.ref("orders_processing").once("value", (snap) => {
-    let = snap.val();
-  });
-  // addresses = formatData(addresses);
-  exportCSVFile(null, addresses, `Addresses ${date}`);
+document.body.appendChild(elt("div", { id: "op_div" }));
+document.body.appendChild(elt("div", { id: "pick_div" }));
+document.body.appendChild(elt("div", { id: "pack_div" }));
+document.body.appendChild(elt("div", { id: "onw_div" }));
+document.body.appendChild(elt("div", { id: "cust_div" }));
+
+//STATE LISTENER
+db.ref("state").on("value", (snap) => {
+  syncDate.innerHTML = "";
+  let dos = snap.val().date_orders_synced;
+  let dps = snap.val().date_products_synced;
+  dos = formatSyncDate(toBoulderTime(dos));
+  dps = formatSyncDate(toBoulderTime(dps));
+  if (dos) syncDate.innerHTML = `Orders Last Synced: ${dos} -  `;
+  if (dps) syncDate.innerHTML += `Products Last Synced: ${dps}`;
+});
+
+//LISTENER - CURRENT_WEEK_DATA
+//How to call only one of these on load and still have both listners?
+//need to update weeks node to be 'Deliveries
+db.ref(`weeks/${currentweek}`).on("value", (snap) => {
+  currentWeekData = snap.val();
+  console.log("currentWeekData DOWNLOADED From Firebase: ", currentWeekData);
+  gen_tables();
+});
+
+//LISTENER - ORDERS_PROCESSING
+db.ref("orders_processing").on("value", (snap) => {
+  orders_processing = snap.val();
+  console.log(
+    "orders_processing DOWNLOADED From Firebase: ",
+    orders_processing
+  );
+  gen_tables();
+});
+
+function gen_tables(orders_processing, currentWeekData) {
+  gen_op_table();
+  gen_pick_table();
+  gen_pack_table();
+  gen_cust_table();
 }
 
-//DATES
-let today = new Date();
-let cutoff = calcCutoff();
-
-function calcCutoff() {
-  let date = new Date();
-  toBoulderTime(date);
-  if (date.getDay() === 0) date.setDate(date.getDate() - 6);
-  else if (date.getDay() === 1) console.log("Today is monday");
-  else date.setDate(date.getDate() - date.getDay() - 1);
-  date.setHours(14, 0, 0, 0);
-  console.log("Cutoff Date was: ", formatSyncDate(date));
-  return date;
-}
-
-function calcCurrentweek() {
-  let date = new Date();
-  toBoulderTime(date);
-  if (date.getDay() === 0) date.setDate(date.getDate() - 6);
-  else if (date.getDay() === 1) console.log("Today is monday");
-  else date.setDate(date.getDate() - date.getDay() - 1);
-  let month = String(date.getMonth() + 1).padStart(2, "0");
-  let dayOfMonth = String(date.getDate()).padStart(2, "0");
-  let year = String(date.getFullYear());
-  let string = `${month}/${dayOfMonth}/${year}`;
-  console.log("Current week: ", string);
-  return string;
-}
-
-function toBoulderTime(date) {
-  date = new Date(date);
-  if (date.getTimezoneOffset() != 420) {
-    date.setHours(date.getHours() - (date.getTimezoneOffset() - 420) / 60);
-  }
-  return date;
-}
+//LISTENER - ORDERS NEXT WEEK Do i neeed this?
+db.ref("orders_next_week").on("value", (snap) => {
+  orders_next_week = snap.val();
+  console.log("orders_next_week DOWNLOADED From Firebase: ", orders_next_week);
+  gen_onw_table(orders_next_week);
+});
 
 //GENERATE HTML TABLES
 //TABLE - ORDERS_PROCESSING
 function gen_op_table() {
+  document.getElementById("op_div").innerHTML = "";
   if (!orders_processing) return;
   console.log("generating Orders- Processing Table");
   // if (snap.exists()) {
   //   return;
   // }
   // if (!snap) return;
-  let orders = orders_processing;
   let table = elt("table");
   table.className = "table";
   table.id = "orders_processing";
@@ -257,7 +218,7 @@ function gen_op_table() {
       "Total"
     )
   );
-  for (const order of Object.values(orders)) {
+  for (const order of Object.values(orders_processing)) {
     row = make_tr(
       null,
       order.number,
@@ -273,11 +234,12 @@ function gen_op_table() {
     );
     table.appendChild(row);
   }
-  document.body.appendChild(table);
+  document.getElementById("op_div").appendChild(table);
 }
 
 //TABLE - ORDERS_NEXT_WEEK
 function gen_onw_table() {
+  document.getElementById("op_div").innerHTML = "";
   console.log("generating Orders_Next_week table");
   if (!orders_next_week) return;
   // if (!snap) return;
@@ -308,11 +270,26 @@ function gen_onw_table() {
       elt(
         "button",
         {
-          onclick: () => {
+          onclick: function () {
             console.log("bump order to this week");
-            db.ref(`weeks/${currentweek}/${order.customer_id}`).set({
+            // set flag on current week to grab into orders_processing
+            db.ref(`weeks/${currentweek}/${order.customer_id}`).update({
               bump: true,
             });
+            //add to orders_processing, leaving on orders_next_week
+            db.ref(`orders_next_week/${order.number}`).once("value", (snap) => {
+              db.ref(`orders_processing/${order.number}`).set(snap.val());
+            });
+            // db.ref(`orders_next_week/${order.number}`).remove()
+            //add to this week, leaving on next week
+            db.ref(`weeks/${nextWeek}/${order.customer_id}`).once(
+              "value",
+              (snap) => {
+                db.ref(`weeks/${currentweek}/${order.customer_id}`).update(
+                  snap.val()
+                );
+              }
+            );
           },
         },
         "Add to this week"
@@ -335,11 +312,12 @@ function gen_onw_table() {
     // console.log(row);
   }
   console.log(table);
-  document.body.appendChild(table);
+  document.getElementById("onw_div").appendChild(table);
 }
 
 //TABLE - PICK TABLE
 function gen_pick_table() {
+  document.getElementById("pick_div").innerHTML = "";
   console.log("generating Pick Table");
   if (!orders_processing) return;
   // if (!snap) return;
@@ -392,11 +370,12 @@ function gen_pick_table() {
   }
 
   console.log(pick);
-  document.body.appendChild(table);
+  document.getElementById("pick_div").appendChild(table);
 }
 
 //TABLE - PACK TABLE
 function gen_pack_table() {
+  document.getElementById("pack_div").innerHTML = "";
   console.log("generating pack table");
   if (!orders_processing) return;
   // if (!snap) return;
@@ -495,6 +474,7 @@ function gen_pack_table() {
     routeBox,
     noteBox
   );
+  document.getElementById("pack_div");
 }
 
 //OLD TABLE - PACK TABLE OLD
@@ -751,6 +731,7 @@ function gen_pack_table_old() {
 
 //TABLE - CUST TABLE
 function gen_cust_table(snap) {
+  document.getElementById("cust_div").innerHTML = "";
   console.log("generating cust Table");
   if (!orders_processing) return;
   // if (!snap) return;
@@ -779,7 +760,7 @@ function gen_cust_table(snap) {
     table.appendChild(row);
   }
   console.log(pick);
-  document.body.appendChild(table);
+  document.getElementById("cust_div").appendChild(table);
 }
 
 // let orders_processing_meta = {};
@@ -796,6 +777,67 @@ function gen_cust_table(snap) {
 //   console.log(pick_meta);
 //   console.log(orders_processing_meta);
 // }
+
+//DOWNLOAD CSV OF ADDRESS
+function downloadAddresses() {
+  console.log("downloading address in CSV");
+  let date = new Date();
+  date = formatSyncDate(date);
+  // console.log(date);
+  let addresses;
+  db.ref("orders_processing").once("value", (snap) => {
+    let = snap.val();
+  });
+  // addresses = formatData(addresses);
+  exportCSVFile(null, addresses, `Addresses ${date}`);
+}
+
+function calcCutoff() {
+  let date = new Date();
+  toBoulderTime(date);
+  if (date.getDay() === 0) date.setDate(date.getDate() - 6);
+  else if (date.getDay() === 1) console.log("Today is monday");
+  else date.setDate(date.getDate() - date.getDay() - 1);
+  date.setHours(14, 0, 0, 0);
+  console.log("Cutoff Date was: ", formatSyncDate(date));
+  return date;
+}
+
+function calcCurrentweek() {
+  let date = new Date();
+  toBoulderTime(date);
+  if (date.getDay() === 0) date.setDate(date.getDate() - 6);
+  else if (date.getDay() === 1) console.log("Today is monday");
+  else date.setDate(date.getDate() - date.getDay() - 1);
+  let month = String(date.getMonth() + 1).padStart(2, "0");
+  let dayOfMonth = String(date.getDate()).padStart(2, "0");
+  let year = String(date.getFullYear());
+  let string = `${month}-${dayOfMonth}-${year}`;
+  console.log("Current week: ", string);
+  return string;
+}
+
+function calcNextWeek() {
+  let date = new Date();
+  toBoulderTime(date);
+  if (date.getDay() === 0) date.setDate(date.getDate() + 1);
+  else if (date.getDay() === 1) date.setDate(date.getDate() + 7);
+  else date.setDate(date.getDate() + 7 - (date.getDay() - 1));
+  let month = String(date.getMonth() + 1).padStart(2, "0");
+  let dayOfMonth = String(date.getDate()).padStart(2, "0");
+  let year = String(date.getFullYear());
+  let string = `${month}-${dayOfMonth}-${year}`;
+  console.log("Current week: ", string);
+  return string;
+}
+
+function toBoulderTime(date) {
+  date = new Date(date);
+  if (date.getTimezoneOffset() != 420) {
+    date.setHours(date.getHours() - (date.getTimezoneOffset() - 420) / 60);
+  }
+  return date;
+}
 
 function packOrder(id) {
   console.log("packing Order");
