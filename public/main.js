@@ -684,7 +684,10 @@ function gen_pack_table() {
       noteBox,
       String(order[0])
     );
-    row.className = currentWeekData[order[0]].packed ? "packed" : "";
+    row.className =
+      currentWeekData[order[0]] && currentWeekData[order[0]].packed
+        ? "packed"
+        : "";
     table.appendChild(row);
   }
   document.getElementById("pack_div").appendChild(table);
@@ -1262,7 +1265,7 @@ function generate_orders_processing(downloadedOrders) {
 
 function show_table(id, tabId) {
   console.log(`showing: ${id}`);
-  console.log(classSelect("table"));
+  // console.log(classSelect("table"));
   for (const table of classSelect("table")) {
     // console.log(table.classList);
     // console.log(table.className);
