@@ -40,6 +40,15 @@ tr {
   width: 100%;
 }
 
+td {
+  padding: 0 1em;
+  vertical-align: baseline;
+}
+
+td td:first-of-type {
+  padding: 0;
+}
+
 #pick td:nth-child(1),
 #pick td:nth-child(3) {
   width: 5%;
