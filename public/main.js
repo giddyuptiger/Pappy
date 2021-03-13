@@ -237,7 +237,7 @@ function gen_tables() {
   gen_op_table();
   gen_pick_table();
   gen_onw_table();
-  // gen_pack_table();
+  gen_pack_table();
   gen_cust_table();
 }
 
@@ -469,7 +469,7 @@ function gen_pick_table() {
   // let headers = ["Product", "Quantity"];
   // pickArray.unshift(headers);
   for (const item of pickArray) {
-    console.log(item);
+    // console.log(item);
     row = make_tr(
       {
         className:
@@ -508,101 +508,175 @@ function gen_pack_table() {
     return;
   }
   // if (!snap) return;
-  let orders = orders_processing;
+  // let orders = orders_processing;
   let table = elt("table");
   // table.className = "table";
   table.id = "pack";
   let row;
-  for (const order of Object.values(orders)) {
+  table.appendChild(
+    make_tr(
+      { class: "header_tr" },
+      "",
+      "First Name",
+      "Last Name",
+      "Total Quantity",
+      "Items",
+      "Price",
+      "Address",
+      "Route",
+      "Week's Notes"
+    )
+  );
+  let packObject = {};
+  for (const order of Object.values(orders_processing)) {
     const customer_id = order.customer_id;
-    addresses.push({ addresses: address(order.billing) });
+    // addresses.push({ addresses: address(order.billing) });
     let orderQuantity = 0;
-    let lineItems = {};
+    // let lineItems = {};
     //create items object
     let theseItems = {};
-    for (const [key, value] of Object.entries(order)) {
-      theseItems[key] = {
-        name: value.name,
-        quantity: value.quantity,
-        product_id: value.product_id,
+    for (const item of Object.values(order.line_items)) {
+      theseItems[item.product_id] = {
+        name: item.name,
+        quantity: item.quantity,
+        class: "class TBD here",
+        // product_id: value.product_id,
       };
-      orderQuantity += value.quantity;
+      orderQuantity += item.quantity;
     }
     //if customer_id already has order on pack list then add items to existing items Object.assign()
-    if (pack[customer_id]) {
-      Object.assign(pack[customer_id].items, theseItems);
+    if (packObject[customer_id]) {
+      Object.assign(pack[customer_id].lineItems, theseItems);
+    } else {
+      let route, note;
+      if (currentWeekData[customer_id]) {
+        route = currentWeekData[customer_id].route;
+        note = stringifyNotes(currentWeekData[customer_id].notes);
+        console.log(route, note);
+      }
+      //add order to pack list if not already exists
+      packObject[customer_id] = {
+        first_name: order.billing.first_name,
+        last_name: order.billing.last_name,
+        address: address(order.billing),
+        lineItems: theseItems,
+        quantity: orderQuantity,
+        total: order.total,
+        customer_note: order.customer_note,
+        route: route,
+        notes: note,
+      };
     }
-    //add order to pack list if not already exists
-    pack[customer_id] = {
-      first_name: order.billing.first_name,
-      last_name: order.billing.last_name,
-      address: address(order.billing),
-      lineItems: theseItems,
-      quantity: orderQuantity,
-      total: order.total,
-      customer_note: order.customer_note,
-      route: "No Route Yet",
-      notes: "",
-    };
   }
-
-  if (currentWeekData[customer_id]) {
-    route = currentWeekData[customer_id].route;
-    note = stringifyNotes(currentWeekData[customer_id].notes);
-    console.log(route, note);
+  console.log(packObject);
+  let packArray = [];
+  for (const [customer_id, item] of Object.entries(packObject)) {
+    console.log(
+      customer_id,
+      item.first_name,
+      item.last_name,
+      item.quantity,
+      item.lineItems,
+      item.total,
+      item.address,
+      item.customer_note,
+      item.route,
+      item.notes
+    );
+    packArray.push([
+      customer_id,
+      item.first_name,
+      item.last_name,
+      item.quantity,
+      item.lineItems,
+      item.total,
+      item.address,
+      item.customer_note,
+      item.route,
+      item.notes,
+    ]);
   }
-  let packOrderButton = elt(
-    "button",
-    {
-      onclick: function () {
-        packOrder(order[0]);
-      },
-      id: order[0],
-    },
-    "Pack"
-  );
-  let routeBox = elt(
-    "div",
-    null,
-    elt("p", null, String(order[7])),
-    elt("input", { id: `${order[0]}/route` }),
-    elt(
+  // console.log(packArray);
+  for (order of packArray) {
+    console.log(order[0]);
+    let packOrderButton = elt(
       "button",
       {
         onclick: function () {
-          submitRoute(`${order[0]}/route`);
+          packOrder(this.id);
         },
+        id: order[0],
       },
-      "Submit Note"
-    )
-  );
-  let noteBox = elt(
-    "div",
-    null,
-    elt("p", null, String(order[8])),
-    elt("input", { id: `${order[0]}/notes` }),
-    elt(
-      "button",
-      {
-        onclick: function () {
-          submitNote(`${order[0]}/notes`);
+      "Pack"
+    );
+    let routeBox = elt(
+      "div",
+      null,
+      elt("p", null, String(order[7])),
+      elt("input", { id: `${order[0]}/route` }),
+      elt(
+        "button",
+        {
+          onclick: function () {
+            submitRoute(`${order[0]}/route`);
+            console.log(`${order[0]}/route`);
+          },
         },
-      },
-      "Submit Note"
-    )
-  );
-  row = make_tr(
-    props,
-    packOrderButton,
-    String(order[1]),
-    String(order[2]),
-    String(order[3]),
-    order[4],
-    String(order[5]),
-    String(order[6]),
-    routeBox,
-    noteBox
-  );
+        "Submit Note"
+      )
+    );
+    let noteBox = elt(
+      "div",
+      null,
+      elt("p", null, String(order[8])),
+      elt("input", { id: `${order[0]}/notes` }),
+      elt(
+        "button",
+        {
+          onclick: function () {
+            submitNote(`${order[0]}/notes`);
+          },
+        },
+        "Submit Note"
+      )
+    );
+    let itemTable = elt("table", { className: "item-table" });
+    for (const [id, value] of Object.entries(order[4])) {
+      let thisbutton = elt(
+        "button",
+        {
+          id: order[0],
+          onclick: function () {
+            packItem(this.id, id);
+          },
+        },
+        "packed"
+      );
+      itemTable.appendChild(
+        make_tr(
+          null,
+          thisbutton,
+          String(value.quantity),
+          String(value.name),
+          String(value.class)
+        )
+      );
+    }
+    row = make_tr(
+      null,
+      packOrderButton,
+      String(order[1]),
+      String(order[2]),
+      String(order[3]),
+      itemTable,
+      String(order[5]),
+      String(order[6]),
+      routeBox,
+      noteBox,
+      String(order[0])
+    );
+    table.appendChild(row);
+  }
   document.getElementById("pack_div").appendChild(table);
 }
 

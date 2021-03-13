@@ -57,7 +57,7 @@ tr {
   text-align: center;
 }
 
-.table td:nth-child(5) {
+#pack .table td:nth-child(5) {
   width: 70%;
 }
 
@@ -97,6 +97,7 @@ tr {
 
 table {
   border: 1px solid black;
+  width: 100%;
 }
 
 .picked {
