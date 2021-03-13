@@ -100,13 +100,14 @@ table {
   width: 100%;
 }
 
-.picked {
-  background-color: rgb(90, 74, 51);
-  color: rgb(179, 179, 179);
+.picked,
+#pack_div .packed {
+  background-color: rgb(201, 129, 29);
+  color: rgb(226, 226, 226);
 }
-.packed {
+/* .packed {
   background-color: rgb(94, 94, 94);
-}
+} */
 
 .table {
   display: none;

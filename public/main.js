@@ -652,15 +652,24 @@ function gen_pack_table() {
         },
         "packed"
       );
-      itemTable.appendChild(
-        make_tr(
-          null,
-          thisbutton,
-          String(value.quantity),
-          String(value.name),
-          String(value.class)
-        )
+      let itemRow = make_tr(
+        null,
+        thisbutton,
+        String(value.quantity),
+        String(value.name),
+        String(value.class)
       );
+      console.log(order[0]);
+      console.log(currentWeekData[order[0]]);
+      itemRow.className =
+        currentWeekData[order[0]] &&
+        currentWeekData[order[0]].items &&
+        currentWeekData[order[0]].items[id] &&
+        currentWeekData[order[0]].items[id].packed
+          ? "packed"
+          : "";
+      itemTable.appendChild(itemRow);
+      console.log(itemRow);
     }
     row = make_tr(
       null,
@@ -675,6 +684,7 @@ function gen_pack_table() {
       noteBox,
       String(order[0])
     );
+    row.className = currentWeekData[order[0]].packed ? "packed" : "";
     table.appendChild(row);
   }
   document.getElementById("pack_div").appendChild(table);
@@ -1053,14 +1063,23 @@ function toBoulderTime(date) {
 function packOrder(id) {
   console.log("packing Order");
   console.log(id);
-  db.ref(`weeks/${currentweek}/${id}`).update({ packed: true });
+  // console.log(currentWeekData);
+  // console.log(currentWeekData.id);
+  db.ref(`weeks/${currentweek}/${id}`).update({
+    packed: currentWeekData[id] && currentWeekData[id].packed ? false : true,
+  });
 }
 
 function packItem(customer_id, item_id) {
   console.log("packing item:");
   console.log(customer_id, item_id);
   db.ref(`weeks/${currentweek}/${customer_id}/items/${item_id}`).update({
-    packed: true,
+    packed:
+      currentWeekData[customer_id] &&
+      currentWeekData[customer_id].items[item_id] &&
+      currentWeekData[customer_id].items[item_id].packed
+        ? false
+        : true,
   });
 }
 
