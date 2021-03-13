@@ -1,3 +1,38 @@
+button {
+  background-color: rgb(0, 0, 0, 0);
+  font-family: Roboto, Helvetica, Arial, sans-serif;
+  border: blanchedalmond;
+  border-style: solid;
+  border-width: 0.1px;
+  color: blanchedalmond;
+  padding: 1em;
+}
+
+#tabs_div > button {
+  background-color: rgb(75, 45, 0);
+  font-size: 1.5em;
+}
+
+button:hover {
+  background-color: rgb(70, 70, 70);
+}
+
+#tabs_div > .active_tab,
+#tabs_div > .active_tab,
+#tabs_div > .active_tab:focus {
+  background-color: rgb(0, 0, 0, 0) !important;
+  border-style: none;
+  outline: none;
+}
+
+#tabs_div {
+  display: flex;
+}
+
+#tabs_div button {
+  flex-grow: 1;
+}
+
 .item-table {
   width: 100%;
 }
@@ -7,12 +42,12 @@ tr {
 
 #pick td:nth-child(1),
 #pick td:nth-child(3) {
-  width:5%;
+  width: 5%;
   text-align: center;
 }
 
 #pack .table tr td:nth-child(4) {
-  width:5%;
+  width: 5%;
   text-align: center;
 }
 
@@ -23,12 +58,12 @@ tr {
 }
 
 .table td:nth-child(5) {
-  width:70%;
+  width: 70%;
 }
 
 .table > tr > td {
   vertical-align: top;
-  padding: .5em;
+  padding: 0.5em;
 }
 
 /* .item-table td:first-of-type {
@@ -49,31 +84,36 @@ tr {
 } */
 
 .table tr:nth-child(odd) {
-  background-color: #8bb0c9;
+  background-color: #3b3b3b;
 }
 
 .table .item-table tr:nth-child(even) {
-  background-color: #98c0db;
+  background-color: #525252;
 }
 
 .table .item-table tr:nth-child(odd) {
-  background-color: #b1d8f3;
+  background-color: #555555;
 }
 
 table {
   border: 1px solid black;
 }
 
+.picked {
+  background-color: rgb(90, 74, 51);
+  color: rgb(179, 179, 179);
+}
 .packed {
   background-color: rgb(94, 94, 94);
 }
 
+.table {
+  display: none;
+}
 
-#orders_processing,
-#cust,
-#pick, 
-#orders_next_week { display: none; }
-
+#pack_div {
+  display: block;
+}
 
 #sync-products,
 #sync-orders {
@@ -81,66 +121,60 @@ table {
   /* font-size: 2em; */
 }
 
+.last-synced {
+  font-size: 11px;
+  color: rgb(116, 116, 116);
+  display: inline-block;
+}
+
+.last-synced-info {
+  display: inline-block;
+  color: rgb(189, 189, 189);
+}
+
+#date_orders_synced {
+  display: flex;
+}
+
+#ols {
+  flex-grow: 1;
+}
+
+#pls {
+  flex-grow: 1;
+}
+
+#no-data-message {
+  padding: 1em;
+  text-align: center;
+  border-style: dotted;
+}
+
 /*from fb*/
 body {
-  background: #7ca0b8;
-  color: rgba(0, 0, 0, 0.87);
+  background: #2b2b2b;
+  color: rgba(221, 221, 221, 0.87);
   font-family: Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
   padding: 0;
 }
 #message {
-  background: #a9cfe9;
+  background: #555555;
   max-width: 360px;
   margin: 10px auto 10px;
-  padding: 1em;
+  padding: 20px 80px 20px 80px;
   border-radius: 3px;
   text-align: center;
-/* }
-#message h2 {
-  color: #ffa100;
-  font-weight: bold;
-  font-size: 16px;
-  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 50px;
+  color: rgb(224, 224, 224);
+  border: orange;
+  border-style: solid;
 }
-#message h1 {
-  font-size: 22px;
-  font-weight: 300;
-  color: rgba(0, 0, 0, 0.6);
-  margin: 0 0 16px;
-}
-#message p {
-  line-height: 140%;
-  margin: 16px 0 24px;
-  font-size: 14px;
-}
-#message a {
+#message img {
   display: block;
-  text-align: center;
-  background: #039be5;
-  text-transform: uppercase;
-  text-decoration: none;
-  color: white;
-  padding: 16px;
-  border-radius: 4px;
+  /* width: 50px; */
+  width: 15%;
 }
-#message,
-#message a {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
-}
-#load {
-  color: rgba(0, 0, 0, 0.4);
-  text-align: center;
-  font-size: 13px;
-}
-@media (max-width: 600px) {
-  body,
-  #message {
-    margin-top: 0;
-    background: white;
-    box-shadow: none;
-  }
-  body {
-    border-top: 16px solid #ffa100;
-  }
-} */

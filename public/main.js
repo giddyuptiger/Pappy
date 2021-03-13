@@ -23,6 +23,7 @@ let subsURL = `${
   websiteURL + apiURL
 }subscriptions?consumer_key=${ck}&consumer_secret=${cs}&per_page=100`;
 console.log(url);
+let downloadedOrders = {};
 
 const mons = [
   "Jan",
@@ -73,6 +74,7 @@ let cutoff = calcCutoff();
 let currentweek = calcCurrentweek();
 let nextWeek = calcNextWeek();
 
+let noDataMessage = elt("h1", { id: "no-data-message" }, "No Orders");
 // //GET KEYS
 // db.ref("admin/auth")
 //   .once("value", (snap) => {
@@ -113,49 +115,103 @@ document.body.appendChild(elt("div", { id: "date_orders_synced" }));
 let syncDate = document.getElementById("date_orders_synced");
 
 //TAB BUTTONS
-document.body.appendChild(
-  elt("button", { onclick: () => show_table("pack") }, "PACK")
-);
-
-document.body.appendChild(
-  elt("button", { onclick: () => show_table("pick") }, "PICK")
-);
-
-document.body.appendChild(
+let tabs_div = document.body.appendChild(elt("div", { id: "tabs_div" }));
+tabs_div.appendChild(
   elt(
     "button",
-    { onclick: () => show_table("orders_processing") },
+    {
+      id: "pack_tab",
+      onclick: function () {
+        show_table("pack_div", this.id);
+      },
+    },
+    "PACK"
+  )
+);
+
+tabs_div.appendChild(
+  elt(
+    "button",
+    {
+      id: "pick_tab",
+      onclick: function () {
+        show_table("pick_div", this.id);
+      },
+    },
+    "PICK"
+  )
+);
+
+tabs_div.appendChild(
+  elt(
+    "button",
+    {
+      id: "cust_tab",
+      onclick: function () {
+        show_table("cust_div", this.id);
+      },
+    },
+    "Customer List"
+  )
+);
+
+tabs_div.appendChild(
+  elt(
+    "button",
+    {
+      id: "op_tab",
+      onclick: function () {
+        show_table("op_div", this.id);
+      },
+    },
     "Orders - Processing"
   )
 );
 
-document.body.appendChild(
-  elt("button", { onclick: () => show_table("cust") }, "Customer List")
-);
-
-document.body.appendChild(
+tabs_div.appendChild(
   elt(
     "button",
-    { onclick: () => show_table("orders_next_week") },
+    {
+      id: "onw_tab",
+      onclick: function () {
+        show_table("onw_div", this.id);
+      },
+    },
     "Orders - Next Week"
   )
 );
 
-document.body.appendChild(elt("div", { id: "op_div" }));
-document.body.appendChild(elt("div", { id: "pick_div" }));
-document.body.appendChild(elt("div", { id: "pack_div" }));
-document.body.appendChild(elt("div", { id: "onw_div" }));
-document.body.appendChild(elt("div", { id: "cust_div" }));
+document.body.appendChild(elt("div", { id: "op_div", className: "table" }));
+document.body.appendChild(elt("div", { id: "pick_div", className: "table" }));
+document.body.appendChild(elt("div", { id: "pack_div", className: "table" }));
+document.body.appendChild(elt("div", { id: "onw_div", className: "table" }));
+document.body.appendChild(elt("div", { id: "cust_div", className: "table" }));
 
 //STATE LISTENER
 db.ref("state").on("value", (snap) => {
   syncDate.innerHTML = "";
   let dos = snap.val().date_orders_synced;
   let dps = snap.val().date_products_synced;
-  dos = formatSyncDate(toBoulderTime(dos));
-  dps = formatSyncDate(toBoulderTime(dps));
-  if (dos) syncDate.innerHTML = `Orders Last Synced: ${dos} -  `;
-  if (dps) syncDate.innerHTML += `Products Last Synced: ${dps}`;
+  dos = formatSyncDate(dos);
+  dps = formatSyncDate(dps);
+  let ols = elt(
+    "p",
+    { id: "ols" },
+    elt(
+      "span",
+      { className: "last-synced", id: "test" },
+      "Orders Last Synced: "
+    ),
+    elt("span", { className: "last-synced-info" }, `${dos}`)
+  );
+  let pls = elt(
+    "p",
+    { id: "pls" },
+    elt("span", { className: "last-synced" }, "Products Last Synced: "),
+    elt("span", { className: "last-synced-info" }, `${dps}`)
+  );
+  if (dos) syncDate.appendChild(ols);
+  if (dos) syncDate.appendChild(pls);
 });
 
 //LISTENER - CURRENT_WEEK_DATA
@@ -177,32 +233,32 @@ db.ref("orders_processing").on("value", (snap) => {
   gen_tables();
 });
 
-function gen_tables(orders_processing, currentWeekData) {
+function gen_tables() {
   gen_op_table();
   gen_pick_table();
+  gen_onw_table();
   // gen_pack_table();
-  // gen_cust_table();
+  gen_cust_table();
 }
 
 //LISTENER - ORDERS NEXT WEEK Do i neeed this?
 db.ref("orders_next_week").on("value", (snap) => {
   orders_next_week = snap.val();
   console.log("orders_next_week DOWNLOADED From Firebase: ", orders_next_week);
-  gen_onw_table(orders_next_week);
+  gen_tables();
 });
 
 //GENERATE HTML TABLES
 //TABLE - ORDERS_PROCESSING
 function gen_op_table() {
   document.getElementById("op_div").innerHTML = "";
-  if (!orders_processing) return;
-  console.log("generating Orders- Processing Table");
-  // if (snap.exists()) {
-  //   return;
-  // }
-  // if (!snap) return;
+  if (!orders_processing) {
+    console.log("no data here");
+    document.getElementById("op_div").appendChild(noDataMessage);
+    return;
+  }
+  console.log("GENERATING orders_processing TABLE");
   let table = elt("table");
-  table.className = "table";
   table.id = "orders_processing";
   let row;
   table.appendChild(
@@ -219,9 +275,36 @@ function gen_op_table() {
     )
   );
   for (const order of Object.values(orders_processing)) {
+    //make these big ass thingd into functions with props for order.customer_id
+    let nextWeekOrderButton = elt("span", null);
+    if (orders_next_week[order.number]) {
+      console.log("this order is from NEXT WEEK!");
+      nextWeekOrderButton = elt(
+        "button",
+        {
+          onclick: function () {
+            if (
+              confirm(
+                "Are you sure you want to remove nw order from this week?"
+              )
+            ) {
+              console.log("remove nw order from this week");
+              // set flag on current week to grab into orders_processing
+              db.ref(`weeks/${currentweek}/${order.customer_id}`).update({
+                bump: false,
+              });
+              //add to orders_processing, leaving on orders_next_week
+              db.ref(`orders_processing/${order.number}`).remove();
+            }
+          },
+        },
+        "Remove from this week"
+      );
+    }
+    let orderNumber = elt("div", null, order.number, nextWeekOrderButton);
     row = make_tr(
       null,
-      order.number,
+      orderNumber,
       order.billing.first_name,
       order.billing.last_name,
       address(order.billing),
@@ -234,20 +317,23 @@ function gen_op_table() {
     );
     table.appendChild(row);
   }
-  console.log(table);
+  console.log("op_table", table);
   document.getElementById("op_div").appendChild(table);
 }
 
 //TABLE - ORDERS_NEXT_WEEK
 function gen_onw_table() {
-  document.getElementById("op_div").innerHTML = "";
+  document.getElementById("onw_div").innerHTML = "";
   console.log("generating Orders_Next_week table");
-  if (!orders_next_week) return;
+  if (!orders_next_week) {
+    document.getElementById("onw_div").appendChild(noDataMessage);
+    return;
+  }
   // if (!snap) return;
   let orders = orders_next_week;
   console.log(orders);
   let table = elt("table");
-  table.className = "table";
+  // table.className = "table";
   table.id = "orders_next_week";
   let row;
   table.appendChild(
@@ -272,25 +358,34 @@ function gen_onw_table() {
         "button",
         {
           onclick: function () {
-            console.log("bump order to this week");
-            // set flag on current week to grab into orders_processing
-            db.ref(`weeks/${currentweek}/${order.customer_id}`).update({
-              bump: true,
-            });
-            //add to orders_processing, leaving on orders_next_week
-            db.ref(`orders_next_week/${order.number}`).once("value", (snap) => {
-              db.ref(`orders_processing/${order.number}`).set(snap.val());
-            });
-            // db.ref(`orders_next_week/${order.number}`).remove()
-            //add to this week, leaving on next week
-            db.ref(`weeks/${nextWeek}/${order.customer_id}`).once(
-              "value",
-              (snap) => {
-                db.ref(`weeks/${currentweek}/${order.customer_id}`).update(
-                  snap.val()
-                );
-              }
-            );
+            if (
+              confirm(
+                `Are you sure you want to bump ${order.billing.first_name} ${order.billing.last_name}'s order for next week to be fulfilled this week?`
+              )
+            ) {
+              console.log("bump order to this week");
+              // set flag on current week to grab into orders_processing
+              db.ref(`weeks/${currentweek}/${order.customer_id}`).update({
+                bump: true,
+              });
+              //add to orders_processing, leaving on orders_next_week
+              db.ref(`orders_next_week/${order.number}`).once(
+                "value",
+                (snap) => {
+                  db.ref(`orders_processing/${order.number}`).set(snap.val());
+                }
+              );
+              // db.ref(`orders_next_week/${order.number}`).remove()
+              //add to this week, leaving on next week
+              db.ref(`weeks/${nextWeek}/${order.customer_id}`).once(
+                "value",
+                (snap) => {
+                  db.ref(`weeks/${currentweek}/${order.customer_id}`).set(
+                    snap.val()
+                  );
+                }
+              );
+            }
           },
         },
         "Add to this week"
@@ -312,7 +407,6 @@ function gen_onw_table() {
     table.appendChild(row);
     // console.log(row);
   }
-  console.log(table);
   document.getElementById("onw_div").appendChild(table);
 }
 
@@ -320,41 +414,71 @@ function gen_onw_table() {
 function gen_pick_table() {
   document.getElementById("pick_div").innerHTML = "";
   console.log("generating Pick Table");
-  if (!orders_processing) return;
+  if (!orders_processing) {
+    // console.log("no data here");
+    document.getElementById("op_div").appendChild(noDataMessage);
+    return;
+  }
+  // if (!orders_processing) return;
   // if (!snap) return;
   let orders = orders_processing;
   let pick = {};
   let table = elt("table");
-  table.className = "table";
+  // table.className = "table";
   table.id = "pick";
+  table.appendChild(make_tr({ class: "header_tr" }, "", "Product", "Quantity"));
   let row;
+  //CREATE PICK OBJECT
   for (const order of Object.values(orders)) {
     // console.log(new Date(order.date_created));
     // console.log(order.date_created);
+    // console.log("looking through order#", order.number);
     for (const item of Object.values(order.line_items)) {
       // if (!pick.[item.name]) Object.assign(pickitem.[item.name])
       // console.log(item.name, item.quantity);
+      // console.log(item.name, item.quantity, item.price, item.product_id);
       if (item.price == "0") continue;
-      let nme = item.name;
-      let qty = item.quantity;
-      let itemObj = {};
-      itemObj[nme] = qty;
+      // let product_id = item.product_id;
+      // let nme = item.name;
+      // let qty = item.quantity;
+      let itemObj = {
+        name: item.name,
+        // id: product_id,
+        quantity: item.quantity,
+      };
+      // itemObj[nme] = qty;
       // console.log(itemObj);
-      if (!pick.hasOwnProperty(item.name)) Object.assign(pick, itemObj);
-      else pick[item.name] += item.quantity;
+      if (!pick.hasOwnProperty(item.product_id)) {
+        pick[item.product_id] = itemObj;
+        // console.log("added to pick: ", pick[item.product_id]);
+        // Object.assign(pick, itemObj);
+      } else {
+        // console.log("before qty", pick[item.product_id][quantity]);
+        pick[item.product_id][quantity] += itemObj.quantity;
+        // console.log("after qty", pick[item.product_id][quantity]);
+      }
     }
   }
+  //CREATE AND SORT PICK ARRAY
   let pickArray = [];
   for (const [item, value] of Object.entries(pick)) {
     // console.log(item, value);
-    pickArray.push([item, value]);
+    pickArray.push([item, value.name, value.quantity]);
   }
-  pickArray.sort(sortFunction);
-  let headers = ["", "Product", "Quantity"];
-  pickArray.unshift(headers);
+  pickArray.sort(sortMultiCols(1));
+  // let headers = ["Product", "Quantity"];
+  // pickArray.unshift(headers);
   for (const item of pickArray) {
+    console.log(item);
     row = make_tr(
-      null,
+      {
+        className:
+          currentWeekData.pickList &&
+          currentWeekData.pickList[item[0]] &&
+          currentWeekData.pickList[item[0]].picked
+            ? "picked"
+            : "",
+      },
       elt(
         "button",
         {
@@ -364,13 +488,12 @@ function gen_pick_table() {
         },
         "Picked"
       ),
-      item[0],
-      String(item[1])
+      item[1],
+      String(item[2])
     );
     table.appendChild(row);
   }
-
-  console.log(pick);
+  console.log("pick: ", pick);
   document.getElementById("pick_div").appendChild(table);
 }
 
@@ -378,11 +501,16 @@ function gen_pick_table() {
 function gen_pack_table() {
   document.getElementById("pack_div").innerHTML = "";
   console.log("generating pack table");
-  if (!orders_processing) return;
+  // if (!orders_processing) return;
+  if (!orders_processing) {
+    console.log("no data here");
+    document.getElementById("op_div").appendChild(noDataMessage);
+    return;
+  }
   // if (!snap) return;
   let orders = orders_processing;
   let table = elt("table");
-  table.className = "table";
+  // table.className = "table";
   table.id = "pack";
   let row;
   for (const order of Object.values(orders)) {
@@ -485,7 +613,7 @@ function gen_pack_table_old() {
   let orders = orders_processing;
   let pack = {};
   let table = elt("table");
-  table.className = "table";
+  // table.className = "table";
   table.id = "pack";
   let row;
   for (const order of Object.values(orders)) {
@@ -731,36 +859,43 @@ function gen_pack_table_old() {
 }
 
 //TABLE - CUST TABLE
-function gen_cust_table(snap) {
+function gen_cust_table() {
   document.getElementById("cust_div").innerHTML = "";
   console.log("generating cust Table");
-  if (!orders_processing) return;
-  // if (!snap) return;
-  let orders = snap.val();
-  let pick = {};
+  if (!orders_processing) {
+    console.log("no data here");
+    document.getElementById("op_div").appendChild(noDataMessage);
+    return;
+  }
   let table = elt("table");
-  table.className = "table";
   table.id = "cust";
   let row;
-  for (const order of Object.values(orders)) {
-    for (const item of Object.values(order.line_items)) {
-      // if (!pick.[item.name]) Object.assign(pickitem.[item.name])
-      // console.log(item.name, item.quantity);
-      let nme = item.name;
-      let qty = item.quantity;
-      let itemObj = {};
-      itemObj[nme] = qty;
-      // console.log(itemObj);
-      if (!pick.hasOwnProperty(item.name)) Object.assign(pick, itemObj);
-      else pick[item.name] += item.quantity;
+  let cust = {};
+  for (const order of Object.values(orders_processing)) {
+    let customer_id = order.customer_id;
+    if (!cust.hasOwnProperty(customer_id)) {
+      cust[customer_id] = {
+        email: order.billing.email,
+        phone: order.billing.phone,
+        first_name: order.billing.first_name,
+        last_name: order.billing.last_name,
+        address: address(order.billing),
+      };
+    } else {
+      console.log("not first order for customer");
     }
   }
-  for (const [item, value] of Object.entries(pick)) {
+  for (const [item, value] of Object.entries(cust)) {
     // console.log(item, value);
-    row = make_tr(null, item, String(value));
+    row = make_tr(
+      { id: `cust-${item}-tr` },
+      value.first_name,
+      value.last_name,
+      value.address
+    );
     table.appendChild(row);
   }
-  console.log(pick);
+  console.log(cust);
   document.getElementById("cust_div").appendChild(table);
 }
 
@@ -796,9 +931,9 @@ function downloadAddresses() {
 function calcCutoff() {
   let date = new Date();
   toBoulderTime(date);
-  if (date.getDay() === 0) date.setDate(date.getDate() - 6);
-  else if (date.getDay() === 1) console.log("Today is monday");
-  else date.setDate(date.getDate() - date.getDay() - 1);
+  if (date.getDay() === 1) console.log("Today is monday");
+  else if (date.getDay() === 0) date.setDate(date.getDate() - 6);
+  else date.setDate(date.getDate() - (date.getDay() - 1));
   date.setHours(14, 0, 0, 0);
   console.log("Cutoff Date was: ", formatSyncDate(date));
   return date;
@@ -807,9 +942,10 @@ function calcCutoff() {
 function calcCurrentweek() {
   let date = new Date();
   toBoulderTime(date);
-  if (date.getDay() === 0) date.setDate(date.getDate() - 6);
-  else if (date.getDay() === 1) console.log("Today is monday");
-  else date.setDate(date.getDate() - date.getDay() - 1);
+  //get last monday
+  if (date.getDay() === 1) console.log("Today is monday");
+  else if (date.getDay() === 0) date.setDate(date.getDate() + 1);
+  else date.setDate(date.getDate() - (date.getDay() - 1));
   let month = String(date.getMonth() + 1).padStart(2, "0");
   let dayOfMonth = String(date.getDate()).padStart(2, "0");
   let year = String(date.getFullYear());
@@ -821,14 +957,14 @@ function calcCurrentweek() {
 function calcNextWeek() {
   let date = new Date();
   toBoulderTime(date);
-  if (date.getDay() === 0) date.setDate(date.getDate() + 1);
-  else if (date.getDay() === 1) date.setDate(date.getDate() + 7);
+  if (date.getDay() === 1) date.setDate(date.getDate() + 7);
+  else if (date.getDay() === 0) date.setDate(date.getDate() + 1);
   else date.setDate(date.getDate() + 7 - (date.getDay() - 1));
   let month = String(date.getMonth() + 1).padStart(2, "0");
   let dayOfMonth = String(date.getDate()).padStart(2, "0");
   let year = String(date.getFullYear());
   let string = `${month}-${dayOfMonth}-${year}`;
-  console.log("Current week: ", string);
+  console.log("Next week: ", string);
   return string;
 }
 
@@ -855,8 +991,19 @@ function packItem(customer_id, item_id) {
 }
 
 function pickItem(item_id) {
-  console.log("picking item");
-  db.ref(`weeks/${currentweek}/pickList/${item_id}`).update({ picked: true });
+  console.log("picking item", item_id);
+  // console.log(currentWeekData.pickList);
+  // console.log(currentWeekData.pickList[item_id]);
+  // console.log(currentWeekData.pickList[item_id].picked);
+
+  db.ref(`weeks/${currentweek}/pickList/${item_id}`).update({
+    picked:
+      currentWeekData.pickList &&
+      currentWeekData.pickList[item_id] &&
+      currentWeekData.pickList[item_id].picked
+        ? false
+        : true,
+  });
 }
 
 let addresses = [];
@@ -878,7 +1025,6 @@ function syncOrders() {
   console.log("SYNCING ORDERS BIG UPLOAD (FREE)");
   dateLastSynced = new Date();
   let pages = 0;
-  let downloadedOrders = {};
   fetch(url).then((response) => {
     const apiPromises = [];
     //get page count and replace the i<=3 below
@@ -968,6 +1114,7 @@ function generate_orders_processing(downloadedOrders) {
       if (
         createdDate < cutoff ||
         (currentWeekData != undefined &&
+          currentWeekData[order.customer_id] &&
           currentWeekData[order.customer_id].bump)
       ) {
         orders_processing[order.number] = order;
@@ -1020,11 +1167,20 @@ function generate_orders_processing(downloadedOrders) {
 
 // function gen_pick() {}
 
-function show_table(id) {
+function show_table(id, tabId) {
   console.log(`showing: ${id}`);
+  console.log(classSelect("table"));
   for (const table of classSelect("table")) {
+    // console.log(table.classList);
+    // console.log(table.className);
     hide(table);
   }
+  document.getElementById("pack_tab").className = "";
+  document.getElementById("pick_tab").className = "";
+  document.getElementById("cust_tab").className = "";
+  document.getElementById("op_tab").className = "";
+  document.getElementById("onw_tab").className = "";
+  document.getElementById(tabId).className = "active_tab";
   show(idSelect(id));
 }
 
@@ -1118,7 +1274,7 @@ function sortFunction(a, b) {
   }
 }
 
-function sort2DArr(firstColToSort, secondColToSort) {
+function sortMultiCols(firstColToSort, secondColToSort) {
   return function sort(a, b) {
     if (a[firstColToSort] === b[firstColToSort]) {
       return a[secondColToSort] < b[secondColToSort]
@@ -1147,7 +1303,7 @@ function formatSyncDate(date) {
   date = new Date(date);
   //DATE
   let dayow = days[date.getDay()];
-  let month = String(date.getMonth() + 1).padStart(2, "0");
+  let month = String(date.getMonth() + 1);
   let day = String(date.getDate()).padStart(2, "0");
   //TIME
   let hours = date.getHours();
