@@ -3,6 +3,8 @@ let orders = {};
 let orders_processing = {};
 let currentWeekData = {};
 let orders_next_week = {};
+let orders_meta = {};
+let products = {};
 // function fetchOrders() {
 // const ck = "ck_e7a75e598b9551db54b160750153656c0d985ef1";
 // const cs = "cs_b341a298a50106f4756c5b62c03f47b2ea9a1ceb";
@@ -233,13 +235,12 @@ db.ref("orders_processing").on("value", (snap) => {
   gen_tables();
 });
 
-function gen_tables() {
-  gen_op_table();
-  gen_pick_table();
-  gen_onw_table();
-  gen_pack_table();
-  gen_cust_table();
-}
+//LISTENER - ORDERS_META
+db.ref("orders_meta").on("value", (snap) => {
+  orders_meta = snap.val();
+  console.log("orders_meta DOWNLOADED From Firebase");
+  gen_tables();
+});
 
 //LISTENER - ORDERS NEXT WEEK Do i neeed this?
 db.ref("orders_next_week").on("value", (snap) => {
@@ -247,6 +248,20 @@ db.ref("orders_next_week").on("value", (snap) => {
   console.log("orders_next_week DOWNLOADED From Firebase: ", orders_next_week);
   gen_tables();
 });
+
+//LISTENER - PRODUCTS
+db.ref("products").on("value", (snap) => {
+  products = snap.val();
+  gen_tables();
+});
+
+function gen_tables() {
+  gen_op_table();
+  gen_pick_table();
+  gen_onw_table();
+  gen_pack_table();
+  gen_cust_table();
+}
 
 //GENERATE HTML TABLES
 //TABLE - ORDERS_PROCESSING
@@ -277,7 +292,7 @@ function gen_op_table() {
   for (const order of Object.values(orders_processing)) {
     //make these big ass thingd into functions with props for order.customer_id
     let nextWeekOrderButton = elt("span", null);
-    if (orders_next_week[order.number]) {
+    if (orders_meta[order.number]) {
       console.log("this order is from NEXT WEEK!");
       nextWeekOrderButton = elt(
         "button",
@@ -290,10 +305,16 @@ function gen_op_table() {
             ) {
               console.log("remove nw order from this week");
               // set flag on current week to grab into orders_processing
-              db.ref(`weeks/${currentweek}/${order.customer_id}`).update({
+              db.ref(`orders_meta/${order.number}`).update({
                 bump: false,
               });
-              //add to orders_processing, leaving on orders_next_week
+              //add to orders_next_week, removing from orders_processing
+              db.ref(`orders_processing/${order.number}`).once(
+                "value",
+                (snap) => {
+                  db.ref(`orders_next_week/${order.number}`).set(snap.val());
+                }
+              );
               db.ref(`orders_processing/${order.number}`).remove();
             }
           },
@@ -365,26 +386,26 @@ function gen_onw_table() {
             ) {
               console.log("bump order to this week");
               // set flag on current week to grab into orders_processing
-              db.ref(`weeks/${currentweek}/${order.customer_id}`).update({
+              db.ref(`orders_meta/${order.number}`).update({
                 bump: true,
               });
-              //add to orders_processing, leaving on orders_next_week
+              //add to orders_processing, removing from orders_next_week
               db.ref(`orders_next_week/${order.number}`).once(
                 "value",
                 (snap) => {
                   db.ref(`orders_processing/${order.number}`).set(snap.val());
                 }
               );
-              // db.ref(`orders_next_week/${order.number}`).remove()
+              db.ref(`orders_next_week/${order.number}`).remove();
               //add to this week, leaving on next week
-              db.ref(`weeks/${nextWeek}/${order.customer_id}`).once(
-                "value",
-                (snap) => {
-                  db.ref(`weeks/${currentweek}/${order.customer_id}`).set(
-                    snap.val()
-                  );
-                }
-              );
+              // db.ref(`weeks/${nextWeek}/${order.customer_id}`).once(
+              //   "value",
+              //   (snap) => {
+              //     db.ref(`weeks/${currentweek}/${order.customer_id}`).set(
+              //       snap.val()
+              //     );
+              //   }
+              // );
             }
           },
         },
@@ -414,14 +435,16 @@ function gen_onw_table() {
 function gen_pick_table() {
   document.getElementById("pick_div").innerHTML = "";
   console.log("generating Pick Table");
-  if (!orders_processing) {
+  if (!orders_processing && !orders_next_week) {
     // console.log("no data here");
     document.getElementById("op_div").appendChild(noDataMessage);
     return;
   }
   // if (!orders_processing) return;
   // if (!snap) return;
-  let orders = orders_processing;
+  let orders = { ...orders_processing, ...orders_next_week };
+  console.log(orders);
+  // let orders = orders_processing;
   let pick = {};
   let table = elt("table");
   // table.className = "table";
@@ -488,7 +511,8 @@ function gen_pick_table() {
         },
         "Picked"
       ),
-      item[1],
+      // `${item[1]} - ${findVariation(item[0])}, id:${item[0]}`,
+      `${item[1]}  --  id:${item[0]}`,
       String(item[2])
     );
     table.appendChild(row);
@@ -507,6 +531,7 @@ function gen_pack_table() {
     document.getElementById("op_div").appendChild(noDataMessage);
     return;
   }
+  let orderCount = Object.keys(orders_processing).length;
   // if (!snap) return;
   // let orders = orders_processing;
   let table = elt("table");
@@ -516,15 +541,17 @@ function gen_pack_table() {
   table.appendChild(
     make_tr(
       { class: "header_tr" },
-      "",
+      `${orderCount} Orders`,
       "First Name",
       "Last Name",
       "Total Quantity",
       "Items",
       "Price",
       "Address",
+      "Pickup/Delivery",
       "Route",
-      "Week's Notes"
+      "Week's Notes",
+      "Customer Notes"
     )
   );
   let packObject = {};
@@ -536,6 +563,9 @@ function gen_pack_table() {
     //create items object
     let theseItems = {};
     for (const item of Object.values(order.line_items)) {
+      if (item.price == 0) {
+        continue;
+      }
       theseItems[item.product_id] = {
         name: item.name,
         quantity: item.quantity,
@@ -546,14 +576,22 @@ function gen_pack_table() {
     }
     //if customer_id already has order on pack list then add items to existing items Object.assign()
     if (packObject[customer_id]) {
-      Object.assign(pack[customer_id].lineItems, theseItems);
+      // console.log(pack);
+      packObject[customer_id].lineItems = {
+        ...packObject[customer_id].lineItems,
+        ...theseItems,
+      };
     } else {
       let route, note;
       if (currentWeekData[customer_id]) {
         route = currentWeekData[customer_id].route;
         note = stringifyNotes(currentWeekData[customer_id].notes);
-        console.log(route, note);
+        // console.log(route, note);
       }
+      let shipping = order.shipping_lines[0].method_id;
+      console.log(shipping);
+      let delivery = /pick/i.test(shipping) ? "Pickup" : "Delivery";
+
       //add order to pack list if not already exists
       packObject[customer_id] = {
         first_name: order.billing.first_name,
@@ -562,27 +600,28 @@ function gen_pack_table() {
         lineItems: theseItems,
         quantity: orderQuantity,
         total: order.total,
+        delivery: delivery,
         customer_note: order.customer_note,
         route: route,
         notes: note,
       };
     }
   }
-  console.log(packObject);
+  // console.log(packObject);
   let packArray = [];
   for (const [customer_id, item] of Object.entries(packObject)) {
-    console.log(
-      customer_id,
-      item.first_name,
-      item.last_name,
-      item.quantity,
-      item.lineItems,
-      item.total,
-      item.address,
-      item.customer_note,
-      item.route,
-      item.notes
-    );
+    // console.log(
+    //   customer_id,
+    //   item.first_name,
+    //   item.last_name,
+    //   item.quantity,
+    //   item.lineItems,
+    //   item.total,
+    //   item.address,
+    //   item.customer_note,
+    //   item.route,
+    //   item.notes
+    // );
     packArray.push([
       customer_id,
       item.first_name,
@@ -594,8 +633,14 @@ function gen_pack_table() {
       item.customer_note,
       item.route,
       item.notes,
+      item.delivery,
+      item.customer_note,
     ]);
   }
+  console.log(packArray);
+  packArray.sort(sortMultiCols(10, 8));
+  // packArray.reverse();
+  console.log(packArray);
   // console.log(packArray);
   for (order of packArray) {
     console.log(order[0]);
@@ -609,37 +654,10 @@ function gen_pack_table() {
       },
       "Pack"
     );
-    let routeBox = elt(
-      "div",
-      null,
-      elt("p", null, String(order[7])),
-      elt("input", { id: `${order[0]}/route` }),
-      elt(
-        "button",
-        {
-          onclick: function () {
-            submitRoute(`${order[0]}/route`);
-            console.log(`${order[0]}/route`);
-          },
-        },
-        "Submit Note"
-      )
-    );
-    let noteBox = elt(
-      "div",
-      null,
-      elt("p", null, String(order[8])),
-      elt("input", { id: `${order[0]}/notes` }),
-      elt(
-        "button",
-        {
-          onclick: function () {
-            submitNote(`${order[0]}/notes`);
-          },
-        },
-        "Submit Note"
-      )
-    );
+    let routeBox = constructRouteBox(order[0], order[8]);
+    // addEnterListener(`${order[0]}_route`, `${order[0]}_route_button`);
+    let noteBox = constructNoteBox(order[0], order[9]);
+
     let itemTable = elt("table", { className: "item-table" });
     for (const [id, value] of Object.entries(order[4])) {
       let thisbutton = elt(
@@ -650,7 +668,7 @@ function gen_pack_table() {
             packItem(this.id, id);
           },
         },
-        "packed"
+        "Pack"
       );
       let itemRow = make_tr(
         null,
@@ -659,8 +677,8 @@ function gen_pack_table() {
         String(value.name),
         String(value.class)
       );
-      console.log(order[0]);
-      console.log(currentWeekData[order[0]]);
+      // console.log(order[0]);
+      // console.log(currentWeekData[order[0]]);
       itemRow.className =
         currentWeekData[order[0]] &&
         currentWeekData[order[0]].items &&
@@ -669,8 +687,9 @@ function gen_pack_table() {
           ? "packed"
           : "";
       itemTable.appendChild(itemRow);
-      console.log(itemRow);
+      // console.log(itemRow);
     }
+    console.log(order[11]);
     row = make_tr(
       null,
       packOrderButton,
@@ -680,9 +699,10 @@ function gen_pack_table() {
       itemTable,
       String(order[5]),
       String(order[6]),
+      String(order[10]),
       routeBox,
       noteBox,
-      String(order[0])
+      String(order[11])
     );
     row.className =
       currentWeekData[order[0]] && currentWeekData[order[0]].packed
@@ -691,258 +711,6 @@ function gen_pack_table() {
     table.appendChild(row);
   }
   document.getElementById("pack_div").appendChild(table);
-}
-
-//OLD TABLE - PACK TABLE OLD
-function gen_pack_table_old() {
-  console.log("generating Pack Table");
-  // if (!snap) return;
-  let orders = orders_processing;
-  let pack = {};
-  let table = elt("table");
-  // table.className = "table";
-  table.id = "pack";
-  let row;
-  for (const order of Object.values(orders)) {
-    const customer_id = order.customer_id;
-    let orderQuantity = 0;
-    // let orderItems = [];
-    let lineItems = {};
-    addresses.push({ address: address(order.billing) });
-    // console.log(addresses);
-
-    // if (pack.hasOwnProperty(order.customer_id)) {
-    //   console.log("second order for customer");
-    //   console.log(pack[customer_id].lineItems);
-    //   let newItemsList = pack[customer_id];
-    // let oldLineItems = pack[order.customer_id].lineItems;
-    // let oldQuantity = pack[order.customer_id].quantity;
-
-    // console.log(pack[order.customer_id].lineItems);
-    // let oldItems = {};
-    // oldItems = pack[order.customer_id].lineItems;
-    // console.log(oldItems);
-    // for (const value of Object.values(lineItems)) {
-    //   oldItems.appendChild(
-    //     make_tr(
-    //       null,
-    //       elt("button", null),
-    //       String(value.name),
-    //       String(value.quantity)
-    //     )j
-    //   );
-    //   console.log(oldItems);
-    //   pack[order.customer_id].lineItems = oldItems;
-    //   // console.log(pack[customer_id].lineItems);
-    //   //  console.log(``);
-    // }
-    // // console.log("old and new", oldLineItems);
-    // pack[order.customer_id].lineItems = oldLineItems + lineItems;
-    // pack[order.customer_id].quantity += orderQuantity;
-    // console.log(pack[order.customer_id].lineItems);
-    // }
-
-    for (const [key, value] of Object.entries(order.line_items)) {
-      // if (!pick.[item.name]) Object.assign(pickitem.[item.name])
-      // console.log(item.name, item.quantity);
-      // console.log(item.price);
-      // console.log(`${key}:  ${value}`);
-      let nme = value.name;
-      let qty = value.quantity;
-      let id = value.product_id;
-      // orderItems.push([nme, qty]);
-      // let itemObj = {};
-      // itemObj[nme] = qty;
-      lineItems[key] = { name: nme, quantity: qty, id: id };
-      // lineItems += `${qty}x ${nme}\n`;
-      orderQuantity += qty;
-    }
-    // console.log(lineItems);
-    let itemTable = elt("table", { className: "item-table" });
-    for (const value of Object.values(lineItems)) {
-      let thisbutton = elt(
-        "button",
-        {
-          id: `${customer_id}/${value.id}`,
-          onclick: function () {
-            packItem(customer_id, value.id);
-          },
-        },
-        "packed"
-      );
-      itemTable.appendChild(
-        make_tr(null, thisbutton, String(value.quantity), String(value.name))
-      );
-      //  console.log(``);
-    }
-    // console.log(itemTable);
-    // if (false /*email exists already on another order*/) {
-    //   order[email].lineItems += lineItems;
-    // }
-    if (!pack.hasOwnProperty(order.customer_id)) {
-      pack[order.customer_id] = {
-        first_name: order.billing.first_name,
-        last_name: order.billing.last_name,
-        address: address(order.billing),
-        // order.billing.phone,
-        // order.customer_id,
-        note: order.customer_note,
-        lineItems: itemTable,
-        quantity: orderQuantity,
-        total: order.total,
-        //total quantity
-      };
-    } else {
-      // console.log("second order for customer");
-      // console.log(pack[order.customer_id].lineItems);
-      // let oldItems = {};
-      // oldItems = pack[order.customer_id].lineItems;
-      // console.log(oldItems);
-      // for (const value of Object.values(lineItems)) {
-      //   oldItems.appendChild(
-      //     make_tr(
-      //       null,
-      //       elt("button", null),
-      //       String(value.name),
-      //       String(value.quantity)
-      //     )
-      //   );
-      //   console.log(oldItems);
-      //   pack[order.customer_id].lineItems = oldItems;
-      //   // console.log(pack[customer_id].lineItems);
-      //   //  console.log(``);
-      // }
-      // let oldLineItems = pack[order.customer_id].lineItems;
-      // let oldQuantity = pack[order.customer_id].quantity;
-      // // console.log("old and new", oldLineItems);
-      // pack[order.customer_id].lineItems = oldLineItems + lineItems;
-      // pack[order.customer_id].quantity += orderQuantity;
-      // // console.log(pack[order.customer_id].lineItems);
-    }
-  }
-  let packArray = [];
-
-  for (const [customer_id, customer] of Object.entries(pack)) {
-    let route;
-    let note;
-    // console.log(currentWeekData[]);
-    if (currentWeekData[customer_id]) {
-      console.log("here");
-      route = currentWeekData[customer_id].route;
-      note = stringifyNotes(currentWeekData[customer_id].notes);
-      console.log(route, note);
-    }
-    // console.log(customer.lineItems);
-    // console.log(item, value);
-    let line = [
-      customer_id,
-      customer.first_name,
-      customer.last_name,
-      customer.quantity,
-      customer.lineItems,
-      "",
-      customer.address,
-      route,
-      note,
-    ];
-    packArray.push(line);
-  }
-  packArray.sort(sortFunction);
-  let headers = [
-    "Packed?",
-    "First",
-    "Last",
-    "Quantity",
-    "Product",
-    "Class",
-    "Address",
-    "Route",
-    "Note",
-  ];
-  packArray.unshift(headers);
-  let currentWeekData1;
-  db.ref(`weeks/${currentweek}`).once("value", (snap) => {
-    currentWeekData1 = snap.val();
-  });
-  for (const order of packArray) {
-    let props = { class: "r" };
-    if (currentWeekData1[order[0]]) {
-      props = { class: currentWeekData1[order[0]].packed ? "packed" : "ss" };
-    }
-    // let orderNote = notes[customer_id]
-    let packOrderButton = elt(
-      "button",
-      {
-        onclick: function () {
-          packOrder(order[0]);
-        },
-        id: order[0],
-      },
-      "Pack"
-    );
-    let routeBox = elt(
-      "div",
-      null,
-      elt("p", null, String(order[7])),
-      elt("input", { id: `${order[0]}/route` }),
-      elt(
-        "button",
-        {
-          onclick: function () {
-            submitRoute(`${order[0]}/route`);
-          },
-        },
-        "Submit Note"
-      )
-    );
-    let noteBox = elt(
-      "div",
-      null,
-      elt("p", null, String(order[8])),
-      elt("input", { id: `${order[0]}/notes` }),
-      elt(
-        "button",
-        {
-          onclick: function () {
-            submitNote(`${order[0]}/notes`);
-          },
-        },
-        "Submit Note"
-      )
-    );
-    row = make_tr(
-      props,
-      packOrderButton,
-      String(order[1]),
-      String(order[2]),
-      String(order[3]),
-      order[4],
-      String(order[5]),
-      String(order[6]),
-      routeBox,
-      noteBox
-    );
-    // row.class = currentWeekData1[order[0]].packed ? "packed" : "";
-
-    if (order[1] === "First") {
-      row = make_tr(
-        "Packed?",
-        String(order[0]),
-        String(order[1]),
-        String(order[2]),
-        String(order[3]),
-        String(order[4]),
-        String(order[5]),
-        String(order[6]),
-        String(order[7]),
-        String(order[8])
-      );
-    }
-    table.appendChild(row);
-  }
-
-  // console.log(pack);
-  document.body.appendChild(table);
 }
 
 //TABLE - CUST TABLE
@@ -986,137 +754,7 @@ function gen_cust_table() {
   document.getElementById("cust_div").appendChild(table);
 }
 
-// let orders_processing_meta = {};
-// let pick_meta = {};
-// get_meta();
-// function get_meta() {
-//   console.log("getting meta");
-//   db.ref("pick_meta").once("value", (snap) => {
-//     pick_meta = snap.val();
-//   });
-//   db.ref("orders_processing_meta").once("value", (snap) => {
-//     orders_processing_meta = snap.val();
-//   });
-//   console.log(pick_meta);
-//   console.log(orders_processing_meta);
-// }
-
-//DOWNLOAD CSV OF ADDRESS
-function downloadAddresses() {
-  console.log("downloading address in CSV");
-  let date = new Date();
-  date = formatSyncDate(date);
-  // console.log(date);
-  let addresses;
-  db.ref("orders_processing").once("value", (snap) => {
-    let = snap.val();
-  });
-  // addresses = formatData(addresses);
-  exportCSVFile(null, addresses, `Addresses ${date}`);
-}
-
-function calcCutoff() {
-  let date = new Date();
-  toBoulderTime(date);
-  if (date.getDay() === 1) console.log("Today is monday");
-  else if (date.getDay() === 0) date.setDate(date.getDate() - 6);
-  else date.setDate(date.getDate() - (date.getDay() - 1));
-  date.setHours(14, 0, 0, 0);
-  console.log("Cutoff Date was: ", formatSyncDate(date));
-  return date;
-}
-
-function calcCurrentweek() {
-  let date = new Date();
-  toBoulderTime(date);
-  //get last monday
-  if (date.getDay() === 1) console.log("Today is monday");
-  else if (date.getDay() === 0) date.setDate(date.getDate() + 1);
-  else date.setDate(date.getDate() - (date.getDay() - 1));
-  let month = String(date.getMonth() + 1).padStart(2, "0");
-  let dayOfMonth = String(date.getDate()).padStart(2, "0");
-  let year = String(date.getFullYear());
-  let string = `${month}-${dayOfMonth}-${year}`;
-  console.log("Current week: ", string);
-  return string;
-}
-
-function calcNextWeek() {
-  let date = new Date();
-  toBoulderTime(date);
-  if (date.getDay() === 1) date.setDate(date.getDate() + 7);
-  else if (date.getDay() === 0) date.setDate(date.getDate() + 1);
-  else date.setDate(date.getDate() + 7 - (date.getDay() - 1));
-  let month = String(date.getMonth() + 1).padStart(2, "0");
-  let dayOfMonth = String(date.getDate()).padStart(2, "0");
-  let year = String(date.getFullYear());
-  let string = `${month}-${dayOfMonth}-${year}`;
-  console.log("Next week: ", string);
-  return string;
-}
-
-function toBoulderTime(date) {
-  date = new Date(date);
-  if (date.getTimezoneOffset() != 420) {
-    date.setHours(date.getHours() - (date.getTimezoneOffset() - 420) / 60);
-  }
-  return date;
-}
-
-function packOrder(id) {
-  console.log("packing Order");
-  console.log(id);
-  // console.log(currentWeekData);
-  // console.log(currentWeekData.id);
-  db.ref(`weeks/${currentweek}/${id}`).update({
-    packed: currentWeekData[id] && currentWeekData[id].packed ? false : true,
-  });
-}
-
-function packItem(customer_id, item_id) {
-  console.log("packing item:");
-  console.log(customer_id, item_id);
-  db.ref(`weeks/${currentweek}/${customer_id}/items/${item_id}`).update({
-    packed:
-      currentWeekData[customer_id] &&
-      currentWeekData[customer_id].items[item_id] &&
-      currentWeekData[customer_id].items[item_id].packed
-        ? false
-        : true,
-  });
-}
-
-function pickItem(item_id) {
-  console.log("picking item", item_id);
-  // console.log(currentWeekData.pickList);
-  // console.log(currentWeekData.pickList[item_id]);
-  // console.log(currentWeekData.pickList[item_id].picked);
-
-  db.ref(`weeks/${currentweek}/pickList/${item_id}`).update({
-    picked:
-      currentWeekData.pickList &&
-      currentWeekData.pickList[item_id] &&
-      currentWeekData.pickList[item_id].picked
-        ? false
-        : true,
-  });
-}
-
-let addresses = [];
-
-let pack = {};
-
-function submitNote(id) {
-  const note = document.getElementById(id).value;
-  // console.log("note")/;
-  db.ref(`weeks/${currentweek}/${id}`).push(note);
-}
-function submitRoute(id) {
-  const route = document.getElementById(id).value;
-  // console.log("note")/;
-  db.ref(`weeks/${currentweek}/${id}`).set(route);
-}
-
+//SYNCING to WOO
 function syncOrders() {
   console.log("SYNCING ORDERS BIG UPLOAD (FREE)");
   dateLastSynced = new Date();
@@ -1194,41 +832,308 @@ function syncProducts() {
   });
 }
 
-// db.ref("orders").once("value", (snap) => {
-//   generate_orders_processing(snap);
-// });
 function generate_orders_processing(downloadedOrders) {
-  // db.ref("orders").once("value", (snap) => {
-  // console.log("DOWNLOADING ORDERS (EXPENSIVE)");
   const orders_processing = {};
   const orders_next_week = {};
-  console.log("creating processing orders list"); //FIX:shouldn't have to recreate and rewrite this on every page open
-  // let orders = snap.val();
-  for (const order of Object.values(downloadedOrders)) {
-    let createdDate = new Date(order.date_created);
-    if (order.status == "processing") {
-      if (
-        createdDate < cutoff ||
-        (currentWeekData != undefined &&
-          currentWeekData[order.customer_id] &&
-          currentWeekData[order.customer_id].bump)
-      ) {
-        orders_processing[order.number] = order;
-        // console.log(order.number, " this week");
-      } else {
-        orders_next_week[order.number] = order;
-        // console.log(order.number, " next week");
+  db.ref("orders_meta").once("value", (snap) => {
+    const orders_meta = snap.val();
+    console.log(orders_meta);
+    console.log("creating processing orders list"); //FIX:shouldn't have to recreate and rewrite this on every page open
+    // let orders = snap.val();
+    for (const order of Object.values(downloadedOrders)) {
+      let createdDate = new Date(order.date_created);
+      if (order.status == "processing") {
+        // console.log(orders_meta[order.number].bump);
+        if (
+          createdDate < cutoff ||
+          (orders_meta &&
+            orders_meta[order.number] &&
+            orders_meta[order.number].bump)
+        ) {
+          orders_processing[order.number] = order;
+          // console.log(order.number, " this week");
+        } else {
+          orders_next_week[order.number] = order;
+          // console.log(order.number, " next week");
+        }
       }
     }
+    console.log("orders_processing: ");
+    console.log(orders_processing);
+    console.log("\norders_next_week: ");
+    console.log(orders_next_week);
+    db.ref("orders_processing").set(orders_processing);
+    db.ref("orders_next_week").set(orders_next_week);
+    console.log("SET NEW ORDERS_PROCESSING AND NEXT WEEK");
+    // });
+  });
+}
+
+//DOWNLOAD CSV OF ADDRESS
+function downloadAddresses() {
+  console.log("downloading address in CSV");
+  let date = new Date();
+  date = formatSyncDate(date);
+  // console.log(date);
+  let addresses;
+  db.ref("orders_processing").once("value", (snap) => {
+    let = snap.val();
+  });
+  // addresses = formatData(addresses);
+  exportCSVFile(null, addresses, `Addresses ${date}`);
+}
+
+function findVariation(item_id) {
+  console.log("finding variaton");
+  let name = products.hasOwnProperty(item_id)
+    ? products[item_id].name
+    : findVariant(item_id);
+  return name;
+}
+function findVariant(id) {
+  console.log("finding variant");
+  console.log(id);
+  let idd = id;
+  while (!products[idd]) {
+    console.log(idd);
+    idd -= 1;
+    console.log(idd);
+    if (idd < 1) break;
   }
-  console.log("orders_processing: ");
-  console.log(orders_processing);
-  console.log("\norders_next_week: ");
-  console.log(orders_next_week);
-  db.ref("orders_processing").set(orders_processing);
-  db.ref("orders_next_week").set(orders_next_week);
-  console.log("SET NEW ORDERS_PROCESSING AND NEXT WEEK");
-  // });
+  return products[id];
+}
+
+// function findVariation(item_id) {
+//   console.log("finding variaton");
+//   if (products.hasOwnProperty(item_id)) {
+//     return products[item_id].name
+//   }
+
+//   let id = item_id;
+//   while (!products[id]) {
+//   id -= 1
+//   // console.log('am i infinite?');
+//   // if (id < 1) {break}
+//   }
+//    for (let variation_number of Object.values(products[id].variations) {
+//      if (variation_number == id) {
+//        //do something to find the variation name or attributes or whatevers
+//      }
+//    }
+//     return
+// }
+
+function calcCutoff() {
+  let date = new Date();
+  toBoulderTime(date);
+  if (date.getDay() === 1) console.log("Today is monday");
+  else if (date.getDay() === 0) date.setDate(date.getDate() - 6);
+  else date.setDate(date.getDate() - (date.getDay() - 1));
+  date.setHours(14, 0, 0, 0);
+  console.log("Cutoff Date was: ", formatSyncDate(date));
+  return date;
+}
+
+function calcCurrentweek() {
+  let date = new Date();
+  toBoulderTime(date);
+  //get last monday
+  if (date.getDay() === 1) console.log("Today is monday");
+  else if (date.getDay() === 0) date.setDate(date.getDate() + 1);
+  else date.setDate(date.getDate() - (date.getDay() - 1));
+  let month = String(date.getMonth() + 1).padStart(2, "0");
+  let dayOfMonth = String(date.getDate()).padStart(2, "0");
+  let year = String(date.getFullYear());
+  let string = `${month}-${dayOfMonth}-${year}`;
+  console.log("Current week: ", string);
+  return string;
+}
+
+function calcNextWeek() {
+  let date = new Date();
+  toBoulderTime(date);
+  if (date.getDay() === 1) date.setDate(date.getDate() + 7);
+  else if (date.getDay() === 0) date.setDate(date.getDate() + 1);
+  else date.setDate(date.getDate() + 7 - (date.getDay() - 1));
+  let month = String(date.getMonth() + 1).padStart(2, "0");
+  let dayOfMonth = String(date.getDate()).padStart(2, "0");
+  let year = String(date.getFullYear());
+  let string = `${month}-${dayOfMonth}-${year}`;
+  console.log("Next week: ", string);
+  return string;
+}
+
+function toBoulderTime(date) {
+  date = new Date(date);
+  if (date.getTimezoneOffset() != 420) {
+    date.setHours(date.getHours() - (date.getTimezoneOffset() - 420) / 60);
+  }
+  return date;
+}
+
+function packOrder(id) {
+  console.log("packing Order");
+  console.log(id);
+  // console.log(currentWeekData);
+  // console.log(currentWeekData.id);
+  db.ref(`weeks/${currentweek}/${id}`).update({
+    packed: currentWeekData[id] && currentWeekData[id].packed ? false : true,
+  });
+}
+
+function packItem(customer_id, item_id) {
+  console.log("packing item:");
+  console.log(customer_id, item_id);
+  db.ref(`weeks/${currentweek}/${customer_id}/items/${item_id}`).update({
+    packed:
+      currentWeekData[customer_id] &&
+      currentWeekData[customer_id].items &&
+      currentWeekData[customer_id].items[item_id] &&
+      currentWeekData[customer_id].items[item_id].packed
+        ? false
+        : true,
+  });
+}
+
+function pickItem(item_id) {
+  console.log("picking item", item_id);
+  // console.log(currentWeekData.pickList);
+  // console.log(currentWeekData.pickList[item_id]);
+  // console.log(currentWeekData.pickList[item_id].picked);
+
+  db.ref(`weeks/${currentweek}/pickList/${item_id}`).update({
+    picked:
+      currentWeekData.pickList &&
+      currentWeekData.pickList[item_id] &&
+      currentWeekData.pickList[item_id].picked
+        ? false
+        : true,
+  });
+}
+
+let addresses = [];
+
+let pack = {};
+
+//add aevent listener to document or each input?
+
+document.body.addEventListener("keydown", function (e) {
+  let code;
+  if (e.key !== undefined) {
+    code = e.key;
+  } else if (e.keyIdentifier !== undefined) {
+    code = e.keyIdentifier;
+  } else if (e.keyCode !== undefined) {
+    code = e.keyCode;
+  }
+  // console.log(e.target.dataset);
+  if (code === "Enter") {
+    if (/route/.test(e.target.id) /*regex for notes/route/etc) */) {
+      submitRoute(e.target.dataset.id);
+      console.log("event!");
+    }
+    if (/notes/.test(e.target.id) /*regex for notes/route/etc) */) {
+      submitNote(e.target.dataset.id);
+      console.log("event!");
+    }
+  }
+});
+
+// function addEnterListener(input_id, button_id) {
+//   document.getElementById(input_id).addEventListener("keydown", function (e) {
+//     //if click enter event listener
+//     var code;
+
+//     if (e.key !== undefined) {
+//       code = e.key;
+//     } else if (e.keyIdentifier !== undefined) {
+//       code = e.keyIdentifier;
+//     } else if (e.keyCode !== undefined) {
+//       code = e.keyCode;
+//     }
+//     console.log(code);
+//     if (code === 13) getElementById(button_id).click();
+//   });
+// }
+
+function stringifyNotes(notes) {
+  if (!notes) return;
+  // console.log(notes);
+  let string = "";
+  for (const value of Object.values(notes)) {
+    string += value + ", ";
+    // console.log(value);
+  }
+  return string;
+}
+
+function submitNote(id) {
+  const note = document.getElementById(`${id}_notes`).value;
+  // console.log("note")/;
+  if (note != "") db.ref(`weeks/${currentweek}/${id}/notes`).push(note);
+}
+
+function submitRoute(id) {
+  const route = document.getElementById(`${id}_route`).value;
+  console.log("route:", route);
+  // console.log("note")/;
+  if (route != "") db.ref(`weeks/${currentweek}/${id}/route`).set(route);
+  // ("");
+}
+
+function constructNoteBox(customer_id, existingNotes) {
+  console.log(
+    `constructing Note box for: ${customer_id} with existing notes: ${existingNotes}`
+  );
+  return eltNEW(
+    "div",
+    null,
+    eltNEW("p", null, existingNotes ? existingNotes : "No notes yet"),
+    eltNEW("input", [
+      { id: `${customer_id}_notes` },
+      { "data-id": `${customer_id}` },
+    ]),
+    eltNEW(
+      "button",
+      [
+        {
+          onclick: function () {
+            submitNote(this.dataset.id);
+          },
+        },
+        { "data-id": `${customer_id}` },
+      ],
+      "Submit"
+    )
+  );
+}
+
+function constructRouteBox(customer_id, existingRoute) {
+  // console.log(
+  //   `constructing route box for: ${customer_id} with existing route: ${existingRoute}`
+  // );
+  return eltNEW(
+    "div",
+
+    null,
+    eltNEW("p", null, existingRoute ? existingRoute : "No route yet"),
+    eltNEW("input", [
+      { id: `${customer_id}_route` },
+      { "data-id": `${customer_id}` },
+    ]),
+    eltNEW(
+      "button",
+      [
+        {
+          onclick: function () {
+            submitRoute(this.dataset.id);
+          },
+        },
+        { "data-id": `${customer_id}`, id: `${customer_id}_route_button` },
+      ],
+      "Submit"
+    )
+  );
 }
 
 // function generate_orders_processing(snap) {
@@ -1344,6 +1249,25 @@ function totalqty(items) {
   }
 }
 
+function eltNEW(type, props, ...children) {
+  let element = document.createElement(type);
+  // if (props) Object.assign(element, props);
+  if (props && Array.isArray(props)) {
+    // let atts = props[1]
+    //  let props = props[0]
+    for (let att of Object.keys(props[1])) {
+      element.setAttribute(att, props[1][att]);
+    }
+    Object.assign(element, props[0]);
+  } else Object.assign(element, props);
+  for (let child of children) {
+    // console.log(typeof child);
+    if (typeof child != "string") element.appendChild(child);
+    else element.appendChild(document.createTextNode(String(child)));
+  }
+  return element;
+}
+
 function elt(type, props, ...children) {
   let element = document.createElement(type);
   if (props) Object.assign(element, props);
@@ -1382,17 +1306,6 @@ function sortMultiCols(firstColToSort, secondColToSort) {
       return a[firstColToSort] < b[firstColToSort] ? -1 : 1;
     }
   };
-}
-
-function stringifyNotes(notes) {
-  if (!notes) return;
-  // console.log(notes);
-  let string = "";
-  for (const value of Object.values(notes)) {
-    string += value + ", ";
-    // console.log(value);
-  }
-  return string;
 }
 
 function formatSyncDate(date) {
